@@ -815,8 +815,10 @@ function hideSuggestions() {
   document.getElementById('street-suggestions').classList.add('hidden');
 }
 
+let selectedFromSuggestion = false;   // true = user picked from autocomplete → skip findOfficialName
 function selectSuggestion(name) {
   document.getElementById('street-input').value = name;
+  selectedFromSuggestion = true;
   hideSuggestions();
 }
 
@@ -834,22 +836,35 @@ async function addStreet() {
 
   try {
     // ── ÉTAPE 1 : trouver le nom officiel OSM ──────────
-    const { name: officialName, suggestions } = await findOfficialName(input);
+    let officialName;
 
-    if (!officialName) {
-      statusEl.className = 'search-status error';
-      statusEl.textContent = `« ${input} » introuvable dans Paris.`;
-      return;
-    }
+    if (selectedFromSuggestion) {
+      // L'utilisateur a sélectionné un nom depuis l'autocomplete →
+      // pas besoin de refaire une requête Overpass, on a déjà le nom exact
+      officialName = input;
+      selectedFromSuggestion = false;
+      // Petit délai pour laisser Overpass souffler après l'autocomplete
+      await new Promise(r => setTimeout(r, 1500));
+    } else {
+      const result = await findOfficialName(input);
+      officialName = result.name;
+      const suggestions = result.suggestions;
 
-    // Si le nom officiel est différent de l'input, informer l'utilisateur
-    // et s'il y a plusieurs suggestions, les montrer
-    if (officialName.toLowerCase() !== input.toLowerCase() && suggestions.length > 1) {
-      statusEl.className = 'search-status';
-      statusEl.textContent = `« ${input} » → trouvé : « ${officialName} ». Autres :`;
-      document.getElementById('street-input').value = officialName;
-      showSuggestions(suggestions, input);
-      // On continue quand même avec le meilleur match
+      if (!officialName) {
+        statusEl.className = 'search-status error';
+        statusEl.textContent = `« ${input} » introuvable dans Paris.`;
+        return;
+      }
+
+      // Si le nom officiel est différent de l'input, informer l'utilisateur
+      if (officialName.toLowerCase() !== input.toLowerCase() && suggestions.length > 1) {
+        statusEl.className = 'search-status';
+        statusEl.textContent = `« ${input} » → trouvé : « ${officialName} ». Autres :`;
+        document.getElementById('street-input').value = officialName;
+        showSuggestions(suggestions, input);
+      }
+      // Délai entre findOfficialName et fetchStreetGeometry
+      await new Promise(r => setTimeout(r, 1000));
     }
 
     // Check si déjà ajoutée
