@@ -829,6 +829,7 @@ async function addStreet() {
   const input = document.getElementById('street-input').value.trim();
   if (!input) return;
   hideSuggestions();
+  clearTimeout(searchTimer);  // annuler toute recherche autocomplete en cours
 
   const statusEl = document.getElementById('search-status');
   statusEl.className = 'search-status';
@@ -894,10 +895,10 @@ async function addStreet() {
     try {
       anchors = await fetchStreetGeometry(officialName);
     } catch(e) {
-      // Retry une fois (Overpass peut timeout)
-      console.warn('First fetch failed, retrying…', e.message);
-      statusEl.textContent = `Nouvelle tentative pour « ${officialName} »…`;
-      await new Promise(r => setTimeout(r, 2000));
+      // Retry une fois après un délai (Overpass rate-limit ou timeout)
+      console.warn('First fetch failed, retrying in 5s…', e.message);
+      statusEl.textContent = `Serveur occupé — nouvelle tentative dans 5s…`;
+      await new Promise(r => setTimeout(r, 5000));
       anchors = await fetchStreetGeometry(officialName);
     }
 
