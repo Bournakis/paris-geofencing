@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Paris Geofencing — Rue de Rivoli</title>
+  <title>Paris Geofencing</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
     :root { --line-color: #e74c3c; }
@@ -215,6 +215,55 @@
     .ctx-info-name { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; }
     .ctx-info-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#8892b0; margin-bottom:3px; gap:12px; }
     .ctx-info-row b { color:#c5cef0; font-weight:700; white-space:nowrap; }
+
+    /* ── ADD STREET SECTION ── */
+    .add-street-section { padding: 0 14px 8px; }
+    .search-wrapper { position: relative; margin-bottom: 7px; }
+    #street-input {
+      width: 100%; padding: 9px 11px; background: #1c2040; border: 1px solid #232645;
+      border-radius: 8px; color: #e2e8f0; font-size: 12px; outline: none;
+      font-family: inherit; transition: border-color .2s;
+    }
+    #street-input:focus { border-color: #7c8fd8; }
+    #street-input::placeholder { color: #4a5280; }
+    .suggestions {
+      position: absolute; top: 100%; left: 0; right: 0; background: #1c2040;
+      border: 1px solid #2d3252; border-radius: 8px; margin-top: 3px;
+      max-height: 180px; overflow-y: auto; z-index: 950; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    }
+    .suggestions.hidden { display: none; }
+    .suggestion-item {
+      padding: 8px 12px; font-size: 12px; color: #a0aec0; cursor: pointer;
+      border-bottom: 1px solid #232645; transition: background .1s;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #232645; color: #e2e8f0; }
+    .suggestion-item .match { color: #7c8fd8; font-weight: 700; }
+    .search-status { font-size: 11px; color: #f39c12; padding: 4px 0 2px; }
+    .search-status.hidden { display: none; }
+    .search-status.error { color: #e74c3c; }
+    .search-status.ok { color: #2ecc71; }
+
+    /* ── STREET LIST ── */
+    #street-list { padding: 0 14px 6px; }
+    .street-list-item {
+      display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+      background: #1c2040; border: 1px solid #232645; border-radius: 8px;
+      margin-bottom: 5px; cursor: pointer; transition: all .15s;
+    }
+    .street-list-item:hover { border-color: #3d4270; }
+    .street-list-item.active { border-color: #7c8fd8; background: #232645; }
+    .street-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .street-list-name { flex: 1; font-size: 12px; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .street-list-meta { font-size: 10px; color: #6470a8; flex-shrink: 0; }
+    .street-delete {
+      width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; background: transparent; border: none; color: #6470a8;
+      font-size: 12px; cursor: pointer; flex-shrink: 0; transition: all .15s;
+    }
+    .street-delete:hover { background: rgba(231,76,60,.15); color: #e74c3c; }
+    .street-list-empty { font-size: 11px; color: #4a5280; padding: 4px 0; font-style: italic; }
+    .street-list-item.loading .street-list-name { color: #6470a8; font-style: italic; }
   </style>
 </head>
 <body>
@@ -231,12 +280,25 @@
       <div class="app-title">Éditeur de ligne</div>
     </div>
 
-    <div class="street-card">
-      <div class="street-badge">Rue · Paris 1er / 4e</div>
-      <div class="street-name">Rue de Rivoli</div>
-      <div class="street-meta">Source : OpenStreetMap · Overpass API</div>
+    <!-- Add street -->
+    <div class="section-title" style="margin-top:10px">Ajouter une rue</div>
+    <div class="add-street-section">
+      <div class="search-wrapper">
+        <input type="text" id="street-input" placeholder="Ex : Rue de Rivoli…" autocomplete="off"
+               oninput="onStreetInput(this.value)" onkeydown="if(event.key==='Enter')addStreet()">
+        <div id="street-suggestions" class="suggestions hidden"></div>
+      </div>
+      <button class="btn btn-green" onclick="addStreet()" id="btn-add-street">＋&nbsp; Rajouter une rue</button>
+      <div id="search-status" class="search-status hidden"></div>
     </div>
 
+    <!-- Street list -->
+    <div class="section-title">Rues</div>
+    <div id="street-list">
+      <div class="street-list-empty">Aucune rue ajoutée</div>
+    </div>
+
+    <!-- Stats for active street -->
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value" id="stat-len">—</div><div class="stat-label">Longueur</div></div>
       <div class="stat-card"><div class="stat-value" id="stat-handles">—</div><div class="stat-label">Poignées</div></div>
@@ -313,7 +375,7 @@
       <div class="loading-box">
         <div class="spinner"></div>
         <div class="loading-title">Chargement en cours…</div>
-        <div class="loading-desc">Récupération des données OpenStreetMap pour la Rue de Rivoli…</div>
+        <div class="loading-desc" id="loading-desc">Récupération des données OpenStreetMap…</div>
       </div>
     </div>
   </div>
@@ -339,16 +401,37 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════
-//  STATE
+//  STATE — MULTI-STREET
 // ═══════════════════════════════════════════════════
-let map, polyline, hitPolyline, bufferLayer;
-let markers    = [];
-let origPts    = null;
-let showBuf    = false;
-let showNums   = false;
+let map;
+let showBuf     = false;
+let showNums    = false;
 let bufferWidth = 30;
-let lineColor  = '#e74c3c';
-let ctxState   = { mode: null, idx: -1, latlng: null };
+let ctxState    = { mode: null, idx: -1, latlng: null };
+
+// Multi-street storage
+const STREET_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#16a085'];
+let streets       = [];  // [{id, name, markers, polyline, hitPolyline, bufferLayer, origPts, color}]
+let activeStreetId = null;
+let streetIdCounter = 0;
+let searchTimer   = null;  // debounce for autocomplete
+
+// Convenience: get active street object
+function getActive() { return streets.find(s => s.id === activeStreetId) || null; }
+
+// Compatibility shims (so existing functions still work)
+function getMarkers()    { const s=getActive(); return s ? s.markers : []; }
+function getPolyline()   { const s=getActive(); return s ? s.polyline : null; }
+function getHitPolyline(){ const s=getActive(); return s ? s.hitPolyline : null; }
+function getColor()      { const s=getActive(); return s ? s.color : '#e74c3c'; }
+
+// Legacy aliases used by existing code
+Object.defineProperty(window, 'markers',     { get(){ return getMarkers(); } });
+Object.defineProperty(window, 'polyline',    { get(){ return getPolyline(); }, set(v){ const s=getActive();if(s)s.polyline=v; } });
+Object.defineProperty(window, 'hitPolyline', { get(){ return getHitPolyline(); }, set(v){ const s=getActive();if(s)s.hitPolyline=v; } });
+Object.defineProperty(window, 'bufferLayer', { get(){ const s=getActive();return s?s.bufferLayer:null; }, set(v){ const s=getActive();if(s)s.bufferLayer=v; } });
+Object.defineProperty(window, 'origPts',     { get(){ const s=getActive();return s?s.origPts:null; }, set(v){ const s=getActive();if(s)s.origPts=v; } });
+Object.defineProperty(window, 'lineColor',   { get(){ return getColor(); }, set(v){ const s=getActive();if(s)s.color=v; } });
 
 // ═══════════════════════════════════════════════════
 //  MAP INIT
@@ -390,122 +473,207 @@ function ptSegDist(px, py, ax, ay, bx, by) {
 }
 
 // ═══════════════════════════════════════════════════
-//  OSM WAY MERGING
+//  OVERPASS → TRI PAR LONGITUDE → SIMPLIFICATION
 // ═══════════════════════════════════════════════════
-function mergeWays(ways) {
-  if (!ways.length) return [];
-  if (ways.length === 1) return ways[0].geometry.map(n=>({lat:n.lat,lon:n.lon}));
 
-  const TOL = 0.00015;
-  const snap = v => Math.round(v/TOL)*TOL;
-  const key  = (lat,lon) => `${snap(lat)},${snap(lon)}`;
-
-  const adj = new Map(), wayMap = new Map();
+/**
+ * Collecte TOUS les points de toutes les ways,
+ * détecte l'axe principal (E-O ou N-S), trie et dédoublonne.
+ * `refStart`/`refEnd` optionnels : si absents, auto-détectés.
+ * Produit une ligne propre, sans zigzag.
+ */
+function cleanMerge(ways, refStart, refEnd) {
+  // 1) Collecter tous les points de géométrie
+  const all = [];
   for (const w of ways) {
-    wayMap.set(w.id, w);
-    const g = w.geometry;
-    const kF = key(g[0].lat,g[0].lon), kL = key(g[g.length-1].lat,g[g.length-1].lon);
-    if (!adj.has(kF)) adj.set(kF,[]);
-    if (!adj.has(kL)) adj.set(kL,[]);
-    adj.get(kF).push({id:w.id,rev:false});
-    adj.get(kL).push({id:w.id,rev:true});
+    for (const n of w.geometry) all.push({lat:n.lat, lon:n.lon});
   }
+  if (all.length < 2) return all;
 
-  let startEntry = null, minLon = Infinity;
-  for (const [k,entries] of adj) {
-    const uniq = new Set(entries.map(e=>e.id));
-    if (uniq.size === 1) {
-      const lon = parseFloat(k.split(',')[1]);
-      if (lon < minLon) { minLon=lon; startEntry=entries[0]; }
+  // 2) Déterminer l'axe principal si pas de référence fournie
+  const lats = all.map(p=>p.lat), lons = all.map(p=>p.lon);
+  const latRange = Math.max(...lats) - Math.min(...lats);
+  const lonRange = Math.max(...lons) - Math.min(...lons);
+  // Facteur de correction: 1° de lon ≈ 0.65° de lat à Paris (cos 48.86°)
+  const isEW = (lonRange * 0.65) >= latRange;  // rue plutôt est-ouest ?
+
+  if (!refStart || !refEnd) {
+    if (isEW) {
+      // Trier par lon → prendre extrêmes
+      all.sort((a,b) => a.lon - b.lon);
+    } else {
+      // Trier par lat → prendre extrêmes
+      all.sort((a,b) => a.lat - b.lat);
     }
-  }
-  if (!startEntry) startEntry = {id:ways[0].id,rev:false};
-
-  const visited=new Set(), path=[];
-  let cur = startEntry;
-  while (cur && !visited.has(cur.id)) {
-    const w = wayMap.get(cur.id); if (!w) break;
-    visited.add(w.id);
-    const nodes = (cur.rev ? [...w.geometry].reverse() : w.geometry).map(n=>({lat:n.lat,lon:n.lon}));
-    path.push(...(path.length ? nodes.slice(1) : nodes));
-    const last = path[path.length-1];
-    const nexts = adj.get(key(last.lat,last.lon)) || [];
-    cur = nexts.find(e=>!visited.has(e.id)) || null;
+    refStart = {lat: all[0].lat, lon: all[0].lon};
+    refEnd   = {lat: all[all.length-1].lat, lon: all[all.length-1].lon};
   }
 
-  // Append remaining disconnected ways
-  const remaining = ways.filter(w=>!visited.has(w.id));
-  for (const w of remaining.sort((a,b)=>{
-    const l=path[path.length-1];
-    return haversine(l.lat,l.lon,a.geometry[0].lat,a.geometry[0].lon)
-          -haversine(l.lat,l.lon,b.geometry[0].lat,b.geometry[0].lon);
-  })) {
-    const g = w.geometry.map(n=>({lat:n.lat,lon:n.lon}));
-    const l = path[path.length-1];
-    if (haversine(l.lat,l.lon,g[g.length-1].lat,g[g.length-1].lon) < haversine(l.lat,l.lon,g[0].lat,g[0].lon)) g.reverse();
-    path.push(...g.slice(1));
+  // 3) Projection sur l'axe principal pour le tri
+  const dx = refEnd.lon - refStart.lon;
+  const dy = refEnd.lat - refStart.lat;
+  const axisLen = Math.hypot(dx, dy);
+  function project(p) {
+    return ((p.lon - refStart.lon)*dx + (p.lat - refStart.lat)*dy) / (axisLen*axisLen);
   }
-  return path;
+  // Perpendicular distance from reference line
+  function perpRef(p) {
+    const t = project(p);
+    const closestLat = refStart.lat + t * dy;
+    const closestLon = refStart.lon + t * dx;
+    return Math.hypot((p.lat - closestLat), (p.lon - closestLon) * 0.65);
+  }
+
+  all.sort((a,b) => project(a) - project(b));
+
+  // 4) Dédoublonner par tranches le long de l'axe principal
+  const SLOT = 0.00015;
+  const slots = new Map();
+  for (const p of all) {
+    const k = Math.round(project(p) * axisLen / SLOT);
+    if (!slots.has(k)) slots.set(k, []);
+    slots.get(k).push(p);
+  }
+
+  function expectedPos(proj) {
+    return {
+      lat: refStart.lat + proj * dy,
+      lon: refStart.lon + proj * dx
+    };
+  }
+
+  const deduped = [];
+  const sortedKeys = [...slots.keys()].sort((a,b) => a - b);
+  for (const k of sortedKeys) {
+    const pts = slots.get(k);
+    // Filtrer les points trop éloignés de la ligne de référence (~90m)
+    const close = pts.filter(p => perpRef(p) < 0.0012);
+    if (!close.length) continue;
+    // Médiane sur les deux axes pour trouver le centre
+    close.sort((a,b) => a.lat - b.lat);
+    const medLat = close[Math.floor(close.length/2)].lat;
+    close.sort((a,b) => a.lon - b.lon);
+    const medLon = close[Math.floor(close.length/2)].lon;
+    deduped.push({lat: medLat, lon: medLon});
+  }
+
+  // 5) Lissage : moyenne glissante (2 passes)
+  let smoothed = deduped;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = [smoothed[0]];
+    for (let i = 1; i < smoothed.length - 1; i++) {
+      next.push({
+        lat: (smoothed[i-1].lat + smoothed[i].lat + smoothed[i+1].lat) / 3,
+        lon: (smoothed[i-1].lon + smoothed[i].lon + smoothed[i+1].lon) / 3
+      });
+    }
+    next.push(smoothed[smoothed.length - 1]);
+    smoothed = next;
+  }
+
+  return smoothed;
 }
 
 /**
- * Resample path: one anchor every `interval` metres.
- * Also always keeps wayBoundary nodes (= intersections).
+ * Simplification Douglas-Peucker sur un tableau de {lat, lon}.
+ * `epsilon` en degrés (~0.00007° ≈ 8 m).
  */
-function resample(path, interval=100, boundaryKeys=new Set()) {
-  if (!path.length) return [];
-  const snap = v=>Math.round(v/0.0001)*0.0001;
-  const key  = p=>`${snap(p.lat)},${snap(p.lon)}`;
-  const out  = [{...path[0]}];
-  let over   = 0;
-  for (let i=1; i<path.length; i++) {
-    const segLen = haversine(path[i-1].lat,path[i-1].lon,path[i].lat,path[i].lon);
-    const isBoundary = boundaryKeys.has(key(path[i]));
-    let pos = interval - over;
+function douglasPeucker(pts, epsilon) {
+  if (pts.length <= 2) return pts;
+  let maxDist = 0, maxIdx = 0;
+  const A = pts[0], B = pts[pts.length - 1];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = perpDist(pts[i], A, B);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left  = douglasPeucker(pts.slice(0, maxIdx + 1), epsilon);
+    const right = douglasPeucker(pts.slice(maxIdx), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [A, B];
+}
+
+function perpDist(P, A, B) {
+  const dx = B.lon - A.lon, dy = B.lat - A.lat;
+  const lenSq = dx*dx + dy*dy;
+  if (!lenSq) return Math.hypot(P.lon - A.lon, P.lat - A.lat);
+  const t = Math.max(0, Math.min(1, ((P.lon-A.lon)*dx + (P.lat-A.lat)*dy) / lenSq));
+  return Math.hypot(P.lon - (A.lon + t*dx), P.lat - (A.lat + t*dy));
+}
+
+/**
+ * Resample: place un point tous les `interval` mètres le long de la polyligne.
+ */
+function resample(path, interval=100) {
+  if (path.length < 2) return [...path];
+  const out = [{...path[0]}];
+  let carry = 0;
+  for (let i = 1; i < path.length; i++) {
+    const segLen = haversine(path[i-1].lat, path[i-1].lon, path[i].lat, path[i].lon);
+    let pos = interval - carry;
     while (pos <= segLen) {
-      const t = pos/segLen;
+      const t = pos / segLen;
       out.push({
-        lat: path[i-1].lat + t*(path[i].lat-path[i-1].lat),
-        lon: path[i-1].lon + t*(path[i].lon-path[i-1].lon)
+        lat: path[i-1].lat + t * (path[i].lat - path[i-1].lat),
+        lon: path[i-1].lon + t * (path[i].lon - path[i-1].lon)
       });
       pos += interval;
     }
-    over = segLen - (pos-interval);
-    // Force a boundary anchor at this node even if not on the 100m grid
-    if (isBoundary && segLen > 5) {
-      const prev = out[out.length-1];
-      if (haversine(prev.lat,prev.lon,path[i].lat,path[i].lon) > 10) {
-        out.push({...path[i]});
-        over = 0;
-      }
-    }
+    carry = segLen - (pos - interval);
   }
-  const last=path[path.length-1], prev=out[out.length-1];
-  if (haversine(prev.lat,prev.lon,last.lat,last.lon) > 5) out.push({...last});
+  const last = path[path.length-1], prev = out[out.length-1];
+  if (haversine(prev.lat, prev.lon, last.lat, last.lon) > 5) out.push({...last});
   return out;
 }
 
 // ═══════════════════════════════════════════════════
-//  OVERPASS FETCH
+//  OVERPASS FETCH — GÉNÉRIQUE POUR TOUTE RUE
 // ═══════════════════════════════════════════════════
-async function loadStreet() {
-  setStatus('Connexion à OpenStreetMap…','loading');
+const PARIS_BBOX = '48.81,2.22,48.91,2.47'; // Grand Paris
 
-  // Query: ALL highway types for Rue de Rivoli — on filtrera par latitude ensuite
+/**
+ * Charge la géométrie d'une rue depuis Overpass et retourne les ancres.
+ * Renvoie un tableau de {lat, lon} ou lève une erreur.
+ */
+async function fetchStreetGeometry(streetName) {
   const query = `[out:json][timeout:60];
 (
-  way["name"="Rue de Rivoli"]["highway"](48.850,2.310,48.872,2.375);
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"](${PARIS_BBOX});
 );
 out geom;`;
 
-  // Droite de référence du tracé validé par l'utilisateur :
-  // début (2.3236, 48.8664) → fin (2.3620, 48.8550)
-  const REF_START = {lat:48.8664, lon:2.3236};
-  const REF_END   = {lat:48.8550, lon:2.3620};
-  function expectedLat(lon) {
-    const t = (lon - REF_START.lon) / (REF_END.lon - REF_START.lon);
-    return REF_START.lat + t * (REF_END.lat - REF_START.lat);
-  }
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'data='+encodeURIComponent(query)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+
+  const allWays = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
+  if (!allWays.length) throw new Error(`Aucun segment OSM trouvé pour « ${streetName} »`);
+
+  // cleanMerge auto-détecte l'axe principal
+  const cleaned = cleanMerge(allWays);
+  const simplified = douglasPeucker(cleaned, 0.00007);
+  const anchors = resample(simplified, 100);
+  return anchors;
+}
+
+// ═══════════════════════════════════════════════════
+//  STREET NAME SEARCH (autocomplete + spell check)
+// ═══════════════════════════════════════════════════
+let lastSearchResults = []; // cached results for current input
+
+async function searchStreetNames(input) {
+  if (input.length < 3) { hideSuggestions(); return; }
+
+  // Escape regex special chars, build case-insensitive regex
+  const escaped = input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const query = `[out:json][timeout:10];
+way["name"~"${escaped}","i"]["highway"](${PARIS_BBOX});
+out tags;`;
 
   try {
     const res = await fetch('https://overpass-api.de/api/interpreter', {
@@ -513,45 +681,204 @@ out geom;`;
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:'data='+encodeURIComponent(query)
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) return;
     const json = await res.json();
 
-    // Filtrer par latitude : garder uniquement les ways dont le point médian
-    // est à moins de 0.0014° (~155 m) de la droite de référence validée
-    const allWays = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
-    const ways = allWays.filter(w => {
-      const mid = w.geometry[Math.floor(w.geometry.length/2)];
-      return Math.abs(mid.lat - expectedLat(mid.lon)) < 0.0014;
-    });
-    if (!ways.length) throw new Error('Aucun segment OSM dans la plage de latitude attendue');
-
-    setStatus(`${ways.length} segments OSM — fusion…`,'loading');
-
-    // Collect way-endpoint keys (= intersections)
-    const snap = v=>Math.round(v/0.0001)*0.0001;
-    const bKeys = new Set();
-    ways.forEach(w => {
-      const g=w.geometry;
-      [g[0], g[g.length-1]].forEach(n => bKeys.add(`${snap(n.lat)},${snap(n.lon)}`));
+    // Unique street names
+    const names = [...new Set(json.elements.map(e => e.tags?.name).filter(Boolean))];
+    names.sort((a,b) => {
+      // Exact prefix match first, then alphabetical
+      const aStart = a.toLowerCase().includes(input.toLowerCase()) ? 0 : 1;
+      const bStart = b.toLowerCase().includes(input.toLowerCase()) ? 0 : 1;
+      return aStart - bStart || a.localeCompare(b, 'fr');
     });
 
-    const raw     = mergeWays(ways);
-    const anchors = resample(raw, 100, bKeys);
+    lastSearchResults = names.slice(0, 8);
+    showSuggestions(lastSearchResults, input);
+  } catch(e) {
+    console.warn('Search failed:', e);
+  }
+}
 
-    origPts = anchors.map(p=>({...p}));
-    buildLine(anchors);
+function onStreetInput(val) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => searchStreetNames(val.trim()), 400);
+}
+
+function showSuggestions(names, input) {
+  const el = document.getElementById('street-suggestions');
+  if (!names.length) { hideSuggestions(); return; }
+
+  const re = new RegExp(`(${input.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+  el.innerHTML = names.map(n =>
+    `<div class="suggestion-item" onclick="selectSuggestion('${n.replace(/'/g,"\\'")}')">${n.replace(re, '<span class="match">$1</span>')}</div>`
+  ).join('');
+  el.classList.remove('hidden');
+}
+
+function hideSuggestions() {
+  document.getElementById('street-suggestions').classList.add('hidden');
+}
+
+function selectSuggestion(name) {
+  document.getElementById('street-input').value = name;
+  hideSuggestions();
+}
+
+// ═══════════════════════════════════════════════════
+//  ADD / SELECT / REMOVE STREETS
+// ═══════════════════════════════════════════════════
+async function addStreet() {
+  const input = document.getElementById('street-input').value.trim();
+  if (!input) return;
+  hideSuggestions();
+
+  const statusEl = document.getElementById('search-status');
+  statusEl.className = 'search-status';
+  statusEl.textContent = 'Recherche…';
+
+  // Check if already added
+  if (streets.find(s => s.name.toLowerCase() === input.toLowerCase())) {
+    statusEl.className = 'search-status error';
+    statusEl.textContent = '⚠ Cette rue est déjà ajoutée.';
+    return;
+  }
+
+  // Assign next color
+  const color = STREET_COLORS[streets.length % STREET_COLORS.length];
+  const id = ++streetIdCounter;
+  const street = {
+    id, name: input, markers: [], polyline: null, hitPolyline: null,
+    bufferLayer: null, origPts: null, color, loading: true
+  };
+  streets.push(street);
+  activeStreetId = id;
+  renderStreetList();
+
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('loading-desc').textContent = `Récupération des données pour « ${input} »…`;
+
+  try {
+    // First: try exact name match
+    let anchors;
+    try {
+      anchors = await fetchStreetGeometry(input);
+    } catch(e) {
+      // If not found, search for suggestions
+      const escaped = input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const query = `[out:json][timeout:10];
+way["name"~"${escaped}","i"]["highway"](${PARIS_BBOX});
+out tags;`;
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'data='+encodeURIComponent(query)
+      });
+      const json = await res.json();
+      const names = [...new Set(json.elements.map(e=>e.tags?.name).filter(Boolean))];
+
+      if (names.length) {
+        // Remove the failed street entry
+        streets = streets.filter(s => s.id !== id);
+        activeStreetId = streets.length ? streets[streets.length-1].id : null;
+        renderStreetList();
+        document.getElementById('loading').classList.add('hidden');
+
+        // Show suggestions
+        statusEl.className = 'search-status error';
+        statusEl.textContent = `« ${input} » introuvable. Vouliez-vous dire :`;
+        document.getElementById('street-input').value = '';
+        showSuggestions(names.slice(0, 6), input);
+        return;
+      }
+      throw e;
+    }
+
+    street.loading = false;
+    street.origPts = anchors.map(p=>({...p}));
+
+    // Build line with this street's color
+    buildLineForStreet(street, anchors);
+
     document.getElementById('loading').classList.add('hidden');
-    setStatus(`Prêt — ${anchors.length} poignées (carrefours + 100 m)`,'ready');
-    fitStreet(); updateStats();
+    document.getElementById('street-input').value = '';
+    statusEl.className = 'search-status ok';
+    statusEl.textContent = `✓ « ${street.name} » ajoutée — ${anchors.length} poignées`;
+    setTimeout(() => { statusEl.className = 'search-status hidden'; }, 4000);
+
+    renderStreetList();
+    fitStreet();
+    updateStats();
+    setStatus(`${streets.length} rue(s) chargée(s)`, 'ready');
 
   } catch(err) {
-    console.warn('Overpass failed:', err);
+    console.warn('addStreet failed:', err);
+    streets = streets.filter(s => s.id !== id);
+    activeStreetId = streets.length ? streets[streets.length-1].id : null;
+    renderStreetList();
     document.getElementById('loading').classList.add('hidden');
-    setStatus('Données OSM indisponibles — coordonnées OSM embarquées utilisées','error');
-    const fb = getFallback();
-    origPts = fb.map(p=>({...p}));
-    buildLine(fb); fitStreet(); updateStats();
+    statusEl.className = 'search-status error';
+    statusEl.textContent = `✕ Rue « ${input} » introuvable dans Paris.`;
   }
+}
+
+function selectStreet(id) {
+  activeStreetId = id;
+  renderStreetList();
+  updateStats();
+
+  // Update color picker to match active street
+  const s = getActive();
+  if (s) {
+    document.documentElement.style.setProperty('--line-color', s.color);
+    document.getElementById('custom-color').value = s.color;
+    document.querySelectorAll('.swatch').forEach(sw => {
+      sw.classList.toggle('active', sw.dataset.color === s.color);
+    });
+  }
+}
+
+function removeStreet(id, ev) {
+  if (ev) ev.stopPropagation();
+  const s = streets.find(s => s.id === id);
+  if (!s) return;
+
+  // Remove from map
+  s.markers.forEach(m => m.remove());
+  if (s.polyline) s.polyline.remove();
+  if (s.hitPolyline) s.hitPolyline.remove();
+  if (s.bufferLayer) s.bufferLayer.remove();
+
+  streets = streets.filter(s => s.id !== id);
+  if (activeStreetId === id) {
+    activeStreetId = streets.length ? streets[streets.length-1].id : null;
+  }
+  renderStreetList();
+  updateStats();
+  setStatus(streets.length ? `${streets.length} rue(s)` : 'Aucune rue', streets.length ? 'ready' : 'loading');
+}
+
+function renderStreetList() {
+  const el = document.getElementById('street-list');
+  if (!streets.length) {
+    el.innerHTML = '<div class="street-list-empty">Aucune rue ajoutée</div>';
+    return;
+  }
+  el.innerHTML = streets.map(s => {
+    const active = s.id === activeStreetId ? ' active' : '';
+    const loading = s.loading ? ' loading' : '';
+    const pts = s.markers.length;
+    const len = s.loading ? '…' : (()=>{
+      const l = pathLen(s.markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};}));
+      return l>1000 ? (l/1000).toFixed(1)+'km' : Math.round(l)+'m';
+    })();
+    return `<div class="street-list-item${active}${loading}" onclick="selectStreet(${s.id})">
+      <div class="street-dot" style="background:${s.color}"></div>
+      <div class="street-list-name">${s.name}</div>
+      <div class="street-list-meta">${s.loading?'chargement…':pts+'pts · '+len}</div>
+      <button class="street-delete" onclick="removeStreet(${s.id},event)" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════
@@ -563,67 +890,92 @@ function makeIcon(isEndpoint) {
 }
 
 function buildLine(pts) {
+  const s = getActive();
+  if (!s) return;
   clearAll();
+  buildLineForStreet(s, pts);
+}
+
+function buildLineForStreet(s, pts) {
   const lls = pts.map(p=>[p.lat,p.lon]);
+  const color = s.color;
+
+  // Remove existing layers for this street
+  s.markers.forEach(m => m.remove());
+  s.markers = [];
+  if (s.polyline) s.polyline.remove();
+  if (s.hitPolyline) s.hitPolyline.remove();
+  if (s.bufferLayer) { s.bufferLayer.remove(); s.bufferLayer = null; }
 
   // Invisible wider polyline for easier right-click detection
-  hitPolyline = L.polyline(lls, { color:'transparent', weight:18, opacity:0, interactive:true }).addTo(map);
-  hitPolyline.on('contextmenu', onLineRightClick);
+  s.hitPolyline = L.polyline(lls, { color:'transparent', weight:18, opacity:0, interactive:true }).addTo(map);
+  s.hitPolyline.on('contextmenu', onLineRightClick);
 
-  // Visible red line
-  polyline = L.polyline(lls, { color:lineColor, weight:4, opacity:0.9, smoothFactor:0.5, interactive:false }).addTo(map);
+  // Visible line
+  s.polyline = L.polyline(lls, { color, weight:4, opacity:0.9, smoothFactor:0.5, interactive:false }).addTo(map);
 
+  // Make this the active street so spawnMarker works
+  activeStreetId = s.id;
   pts.forEach((p,i) => spawnMarker(p,i));
   refreshEndpoints();
 }
 
 function spawnMarker(pt, idx) {
+  const s = getActive(); if (!s) return;
   const m = L.marker([pt.lat, pt.lon], {
     draggable:true, icon:makeIcon(false), zIndexOffset:200
   });
   m.bindTooltip('', {direction:'top', className:'handle-tooltip', opacity:1});
+  m._streetId = s.id;  // tag marker with its street
 
   m.on('drag', () => {
+    // Ensure this marker's street is active
+    if (activeStreetId !== m._streetId) selectStreet(m._streetId);
     refreshPolyline();
     if (showBuf) renderBuffer();
-    updateTooltip(m, markers.indexOf(m));
+    updateTooltip(m, s.markers.indexOf(m));
   });
-  m.on('dragend', updateStats);
+  m.on('dragend', () => { updateStats(); renderStreetList(); });
 
   m.on('contextmenu', e => {
+    if (activeStreetId !== m._streetId) selectStreet(m._streetId);
     L.DomEvent.stopPropagation(e);
-    openCtx(e.originalEvent, 'marker', markers.indexOf(m), null);
+    openCtx(e.originalEvent, 'marker', s.markers.indexOf(m), null);
   });
 
   m.addTo(map);
-  markers.splice(idx, 0, m);
+  s.markers.splice(idx, 0, m);
   updateTooltip(m, idx);
 }
 
 function refreshPolyline() {
-  const lls = markers.map(m=>m.getLatLng());
-  if (polyline)    polyline.setLatLngs(lls);
-  if (hitPolyline) hitPolyline.setLatLngs(lls);
+  const s = getActive(); if (!s) return;
+  const lls = s.markers.map(m=>m.getLatLng());
+  if (s.polyline)    s.polyline.setLatLngs(lls);
+  if (s.hitPolyline) s.hitPolyline.setLatLngs(lls);
 }
 
 function refreshEndpoints() {
-  markers.forEach((m,i) => m.setIcon(makeIcon(i===0 || i===markers.length-1)));
-  markers.forEach((m,i) => updateTooltip(m,i));
+  const s = getActive(); if (!s) return;
+  s.markers.forEach((m,i) => m.setIcon(makeIcon(i===0 || i===s.markers.length-1)));
+  s.markers.forEach((m,i) => updateTooltip(m,i));
 }
 
 function updateTooltip(m, i) {
+  const s = getActive(); if (!s) return;
   const ll  = m.getLatLng();
-  const ep  = (i===0 || i===markers.length-1);
+  const ep  = (i===0 || i===s.markers.length-1);
   const lbl = ep ? (i===0?'🟡 Début':'🟡 Fin') : `Poignée #${i+1}`;
   const geo = showNums ? `<br><span style="color:#6470a8">${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}</span>` : '';
   m.setTooltipContent(`<b>${lbl}</b>${geo}`);
 }
 
 function clearAll() {
-  if (hitPolyline) { hitPolyline.remove(); hitPolyline=null; }
-  if (polyline)    { polyline.remove();    polyline=null; }
-  if (bufferLayer) { bufferLayer.remove(); bufferLayer=null; }
-  markers.forEach(m=>m.remove()); markers=[];
+  const s = getActive(); if (!s) return;
+  if (s.hitPolyline) { s.hitPolyline.remove(); s.hitPolyline=null; }
+  if (s.polyline)    { s.polyline.remove();    s.polyline=null; }
+  if (s.bufferLayer) { s.bufferLayer.remove(); s.bufferLayer=null; }
+  s.markers.forEach(m=>m.remove()); s.markers=[];
 }
 
 // ═══════════════════════════════════════════════════
@@ -642,42 +994,49 @@ function updateBufWidth(val) {
 }
 
 function renderBuffer() {
-  if (bufferLayer) { bufferLayer.remove(); bufferLayer=null; }
-  if (!showBuf || markers.length < 2) return;
-  const lls   = markers.map(m=>m.getLatLng());
-  const polys = [];
-  for (let i=0; i<lls.length-1; i++) {
-    const a=lls[i], b=lls[i+1];
-    const latR = bufferWidth/111320;
-    const lngR = bufferWidth/(111320*Math.cos(a.lat*Math.PI/180));
-    const dx=b.lng-a.lng, dy=b.lat-a.lat, len=Math.hypot(dx,dy);
-    if (!len) continue;
-    const nx=(-dy/len)*lngR, ny=(dx/len)*latR;
-    polys.push([[
-      [a.lng+nx,a.lat+ny],[b.lng+nx,b.lat+ny],
-      [b.lng-nx,b.lat-ny],[a.lng-nx,a.lat-ny],
-      [a.lng+nx,a.lat+ny]
-    ]]);
-  }
-  bufferLayer = L.geoJSON({
-    type:'FeatureCollection',
-    features:polys.map(c=>({type:'Feature',geometry:{type:'Polygon',coordinates:c}}))
-  }, { style:{color:lineColor,weight:0,fillColor:lineColor,fillOpacity:0.15} }).addTo(map);
-  bufferLayer.bringToBack();
-  if (polyline) polyline.bringToFront();
+  // Render buffer for ALL streets if showBuf is on
+  streets.forEach(s => {
+    if (s.bufferLayer) { s.bufferLayer.remove(); s.bufferLayer = null; }
+    if (!showBuf || s.markers.length < 2) return;
+    const lls  = s.markers.map(m=>m.getLatLng());
+    const polys = [];
+    for (let i=0; i<lls.length-1; i++) {
+      const a=lls[i], b=lls[i+1];
+      const latR = bufferWidth/111320;
+      const lngR = bufferWidth/(111320*Math.cos(a.lat*Math.PI/180));
+      const dx=b.lng-a.lng, dy=b.lat-a.lat, len=Math.hypot(dx,dy);
+      if (!len) continue;
+      const nx=(-dy/len)*lngR, ny=(dx/len)*latR;
+      polys.push([[
+        [a.lng+nx,a.lat+ny],[b.lng+nx,b.lat+ny],
+        [b.lng-nx,b.lat-ny],[a.lng-nx,a.lat-ny],
+        [a.lng+nx,a.lat+ny]
+      ]]);
+    }
+    s.bufferLayer = L.geoJSON({
+      type:'FeatureCollection',
+      features:polys.map(c=>({type:'Feature',geometry:{type:'Polygon',coordinates:c}}))
+    }, { style:{color:s.color,weight:0,fillColor:s.color,fillOpacity:0.15} }).addTo(map);
+    s.bufferLayer.bringToBack();
+    if (s.polyline) s.polyline.bringToFront();
+  });
 }
 
 // ═══════════════════════════════════════════════════
 //  COLOUR
 // ═══════════════════════════════════════════════════
 function setLineColor(color, btn) {
-  lineColor = color;
+  const s = getActive();
+  if (s) {
+    s.color = color;
+    if (s.polyline) s.polyline.setStyle({color});
+  }
   document.documentElement.style.setProperty('--line-color', color);
   document.getElementById('custom-color').value = color;
-  if (polyline) polyline.setStyle({color});
   if (showBuf) renderBuffer();
-  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.swatch').forEach(sw=>sw.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  renderStreetList();
 }
 
 // ═══════════════════════════════════════════════════
@@ -689,42 +1048,54 @@ function importJSON(ev) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      let pts = null;
+      let featuresToImport = [];
 
       // GeoJSON Feature with LineString
       if (data.type==='Feature' && data.geometry?.type==='LineString') {
-        pts = data.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+        featuresToImport.push({ name: data.properties?.name || file.name.replace(/\.geo?json$/,''), coords: data.geometry.coordinates });
       }
-      // GeoJSON FeatureCollection
+      // GeoJSON FeatureCollection — import ALL LineString features
       else if (data.type==='FeatureCollection') {
-        const f = data.features?.find(f=>f.geometry?.type==='LineString');
-        if (f) pts = f.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+        for (const f of (data.features||[])) {
+          if (f.geometry?.type==='LineString') {
+            featuresToImport.push({ name: f.properties?.name || 'Rue importée', coords: f.geometry.coordinates, color: f.properties?.line_color });
+          }
+        }
       }
-      // Raw array of {lat,lon} or {lat,lng}
-      else if (Array.isArray(data)) {
-        pts = data.map(p=>({lat:parseFloat(p.lat), lon:parseFloat(p.lon??p.lng)}));
-      }
-      // Raw coordinates array [[lng,lat],...]
-      else if (Array.isArray(data?.coordinates)) {
-        pts = data.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+      // Raw array or coordinates
+      else {
+        let pts = null;
+        if (Array.isArray(data)) pts = data.map(p=>({lat:parseFloat(p.lat), lon:parseFloat(p.lon??p.lng)}));
+        else if (Array.isArray(data?.coordinates)) pts = data.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+        if (pts) featuresToImport.push({ name: file.name.replace(/\.geo?json$/,''), rawPts: pts });
       }
 
-      if (!pts || pts.length<2) throw new Error('Format non reconnu ou données insuffisantes');
-      pts = pts.filter(p=>isFinite(p.lat)&&isFinite(p.lon));
-      if (pts.length<2) throw new Error('Coordonnées invalides dans le fichier');
+      if (!featuresToImport.length) throw new Error('Format non reconnu ou données insuffisantes');
 
-      clearAll();
-      origPts = pts.map(p=>({...p}));
-      buildLine(pts);
-      fitStreet(); updateStats();
-      setStatus(`✓ Importé : ${pts.length} poignées chargées depuis ${file.name}`,'ready');
+      let imported = 0;
+      for (const feat of featuresToImport) {
+        let pts = feat.rawPts || feat.coords.map(([lng,lat])=>({lat,lon:lng}));
+        pts = pts.filter(p=>isFinite(p.lat)&&isFinite(p.lon));
+        if (pts.length < 2) continue;
+
+        const color = feat.color || STREET_COLORS[streets.length % STREET_COLORS.length];
+        const id = ++streetIdCounter;
+        const s = { id, name: feat.name, markers: [], polyline: null, hitPolyline: null, bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false };
+        streets.push(s);
+        activeStreetId = id;
+        buildLineForStreet(s, pts);
+        imported++;
+      }
+
+      renderStreetList(); fitStreet(); updateStats();
+      setStatus(`✓ Importé : ${imported} rue(s) depuis ${file.name}`, 'ready');
     } catch(err) {
       setStatus('Erreur import : '+err.message,'error');
       alert('Impossible de lire ce fichier JSON :\n'+err.message);
     }
   };
   reader.readAsText(file);
-  ev.target.value=''; // Allow re-importing same file
+  ev.target.value='';
 }
 
 // ═══════════════════════════════════════════════════
@@ -732,7 +1103,8 @@ function importJSON(ev) {
 // ═══════════════════════════════════════════════════
 /** Distance cumulée (mètres) depuis le début de la ligne jusqu'au point cliqué */
 function distanceAlongLine(latlng) {
-  const lls = markers.map(m=>m.getLatLng());
+  const s = getActive(); if (!s) return 0;
+  const lls = s.markers.map(m=>m.getLatLng());
   let bestIdx=0, minD=Infinity;
   for (let i=0; i<lls.length-1; i++) {
     const d=ptSegDist(latlng.lng,latlng.lat,lls[i].lng,lls[i].lat,lls[i+1].lng,lls[i+1].lat);
@@ -760,7 +1132,8 @@ function onLineRightClick(e) {
 
 function nearestSegIdx(latlng) {
   let best=1, minD=Infinity;
-  const lls = markers.map(m=>m.getLatLng());
+  const s = getActive(); if (!s) return 1;
+  const lls = s.markers.map(m=>m.getLatLng());
   for (let i=0; i<lls.length-1; i++) {
     const d = ptSegDist(latlng.lng,latlng.lat,lls[i].lng,lls[i].lat,lls[i+1].lng,lls[i+1].lat);
     if (d<minD) { minD=d; best=i+1; }
@@ -777,10 +1150,11 @@ function openCtx(ev, mode, idx, latlng) {
   if (mode === 'line' && latlng) {
     const dist   = distanceAlongLine(latlng);
     const distFmt = dist > 1000 ? (dist/1000).toFixed(2)+' km' : Math.round(dist)+' m';
-    const total  = pathLen(markers.map(m=>{const l=m.getLatLng();return{lat:l.lat,lon:l.lng};}));
+    const total  = pathLen((getActive()?.markers||[]).map(m=>{const l=m.getLatLng();return{lat:l.lat,lon:l.lng};}));
     const totalFmt = total>1000?(total/1000).toFixed(2)+' km':Math.round(total)+' m';
+    const activeName = getActive()?.name || 'Rue';
     infoEl.innerHTML = `
-      <div class="ctx-info-name">📍 Rue de Rivoli</div>
+      <div class="ctx-info-name">📍 ${activeName}</div>
       <div class="ctx-info-row"><span>Depuis le début</span><b>${distFmt}</b></div>
       <div class="ctx-info-row"><span>Longueur totale</span><b>${totalFmt}</b></div>
       <div class="ctx-info-row"><span>Coordonnées</span><b>${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}</b></div>`;
@@ -819,18 +1193,21 @@ function ctxAdd() {
   refreshEndpoints();
   updateStats();
   if (showBuf) renderBuffer();
+  renderStreetList();
 }
 
 function ctxDelete() {
   const idx = ctxState.idx;         // ← save first
   closeCtx();
-  if (markers.length <= 2) { alert('La ligne doit conserver au moins 2 poignées.'); return; }
-  markers[idx].remove();
-  markers.splice(idx, 1);
+  const s = getActive(); if (!s) return;
+  if (s.markers.length <= 2) { alert('La ligne doit conserver au moins 2 poignées.'); return; }
+  s.markers[idx].remove();
+  s.markers.splice(idx, 1);
   refreshPolyline();
   refreshEndpoints();
   updateStats();
   if (showBuf) renderBuffer();
+  renderStreetList();
 }
 
 document.addEventListener('click', e => { if (!e.target.closest('#ctx-menu')) closeCtx(); });
@@ -840,46 +1217,70 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') closeCtx(); })
 //  STATS & UI
 // ═══════════════════════════════════════════════════
 function updateStats() {
-  const pts = markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
+  const s = getActive();
+  if (!s || !s.markers.length) {
+    document.getElementById('stat-len').textContent = '—';
+    document.getElementById('stat-handles').textContent = '—';
+    document.getElementById('stat-seg').textContent = '—';
+    return;
+  }
+  const pts = s.markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
   const len = pathLen(pts);
   document.getElementById('stat-len').textContent = len>1000?(len/1000).toFixed(2)+' km':Math.round(len)+' m';
-  document.getElementById('stat-handles').textContent = markers.length;
-  document.getElementById('stat-seg').textContent = Math.max(0,markers.length-1);
-  markers.forEach((m,i)=>updateTooltip(m,i));
+  document.getElementById('stat-handles').textContent = s.markers.length;
+  document.getElementById('stat-seg').textContent = Math.max(0,s.markers.length-1);
+  s.markers.forEach((m,i)=>updateTooltip(m,i));
 }
 
-function toggleNumbers(on) { showNums=on; markers.forEach((m,i)=>updateTooltip(m,i)); }
+function toggleNumbers(on) { showNums=on; const s=getActive(); if(s) s.markers.forEach((m,i)=>updateTooltip(m,i)); }
 function setStatus(msg,type='loading') { document.getElementById('status-text').textContent=msg; document.getElementById('status-dot').className=type; }
-function fitStreet() { if (markers.length) map.fitBounds(L.latLngBounds(markers.map(m=>m.getLatLng())),{padding:[40,60]}); }
+
+function fitStreet() {
+  // Fit all streets or just active
+  const allMarkers = streets.flatMap(s => s.markers);
+  if (allMarkers.length) map.fitBounds(L.latLngBounds(allMarkers.map(m=>m.getLatLng())),{padding:[40,60]});
+}
 
 function resetLine() {
-  if (!origPts) return;
-  clearAll(); buildLine(origPts); updateStats();
+  const s = getActive();
+  if (!s || !s.origPts) return;
+  buildLineForStreet(s, s.origPts); updateStats();
   setStatus('Ligne réinitialisée','ready');
   if (showBuf) renderBuffer();
+  renderStreetList();
 }
 
 // ═══════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════
 function exportGeoJSON() {
-  const pts = markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
-  const FILENAME = 'rue-de-rivoli-geofencing.geojson';
-  const geojson = {
-    type:'FeatureCollection',
-    features:[{
+  if (!streets.length) { alert('Aucune rue à exporter.'); return; }
+
+  // Build one Feature per street
+  const features = streets.map(s => {
+    const pts = s.markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
+    return {
       type:'Feature',
       properties:{
-        name:'Rue de Rivoli', city:'Paris', type:'geofencing-centerline',
-        total_length_m:Math.round(pathLen(pts)), anchor_count:markers.length,
-        buffer_width_m:bufferWidth, line_color:lineColor,
+        name: s.name, city:'Paris', type:'geofencing-centerline',
+        total_length_m: Math.round(pathLen(pts)), anchor_count: s.markers.length,
+        buffer_width_m: bufferWidth, line_color: s.color,
         source:'OpenStreetMap / Paris Geofencing Editor',
-        generated_at:new Date().toISOString()
+        generated_at: new Date().toISOString()
       },
-      geometry:{ type:'LineString', coordinates:markers.map(m=>{const ll=m.getLatLng();return[ll.lng,ll.lat];}) }
-    }]
-  };
-  const body = JSON.stringify(geojson,null,2);
+      geometry:{
+        type:'LineString',
+        coordinates: s.markers.map(m=>{const ll=m.getLatLng();return[ll.lng,ll.lat];})
+      }
+    };
+  });
+
+  const FILENAME = streets.length === 1
+    ? streets[0].name.toLowerCase().replace(/[^a-z0-9àâäéèêëïîôùûüÿçœæ]+/g,'-') + '-geofencing.geojson'
+    : 'paris-geofencing-export.geojson';
+
+  const geojson = { type:'FeatureCollection', features };
+  const body = JSON.stringify(geojson, null, 2);
 
   // ① Téléchargement navigateur
   const blob=new Blob([body],{type:'application/json'});
@@ -887,22 +1288,21 @@ function exportGeoJSON() {
   Object.assign(document.createElement('a'),{href:url,download:FILENAME}).click();
   URL.revokeObjectURL(url);
 
-  // ② Sauvegarde automatique côté serveur (dossier GEOFENCING)
+  // ② Sauvegarde automatique côté serveur
   fetch('/save', {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Filename':FILENAME},
     body
   }).then(r=>r.json()).then(d=>{
-    setStatus(d.ok ? `✓ Exporté et sauvegardé : ${FILENAME}` : `Exporté (save local échoué)`, 'ready');
+    setStatus(d.ok ? `✓ Exporté : ${FILENAME} (${streets.length} rue(s))` : `Exporté (save local échoué)`, 'ready');
   }).catch(()=>{
     setStatus(`✓ GeoJSON exporté (pas de serveur local actif)`, 'ready');
   });
 }
 
 // ═══════════════════════════════════════════════════
-//  FALLBACK COORDINATES
+//  FALLBACK COORDINATES — Rue de Rivoli
 //  Coordonnées VALIDÉES par l'utilisateur le 23/03/2026
-//  (extrait de rue-de-rivoli-geofencing.geojson exporté)
 //  Format GeoJSON [lon, lat] → converti en {lat, lon}
 // ═══════════════════════════════════════════════════
 function getFallback() {
@@ -939,9 +1339,29 @@ function getFallback() {
 }
 
 // ═══════════════════════════════════════════════════
-//  BOOT
+//  BOOT — chargement initial avec Rue de Rivoli
 // ═══════════════════════════════════════════════════
-loadStreet();
+(function boot() {
+  document.getElementById('loading').classList.add('hidden');
+  setStatus('Tapez un nom de rue pour commencer', 'ready');
+
+  // Pré-charger Rue de Rivoli avec les données embarquées
+  const fb = getFallback();
+  const id = ++streetIdCounter;
+  const s = {
+    id, name: 'Rue de Rivoli', markers: [], polyline: null,
+    hitPolyline: null, bufferLayer: null,
+    origPts: fb.map(p=>({...p})),
+    color: STREET_COLORS[0], loading: false
+  };
+  streets.push(s);
+  activeStreetId = id;
+  buildLineForStreet(s, fb);
+  renderStreetList();
+  fitStreet();
+  updateStats();
+  setStatus('1 rue chargée — ajoutez-en d\'autres !', 'ready');
+})();
 </script>
 </body>
 </html>
