@@ -6,6 +6,7 @@
   <title>Paris Geofencing — Rue de Rivoli</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
+    :root { --line-color: #e74c3c; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -36,30 +37,10 @@
       border-bottom: 1px solid #232645;
       background: #0d0f1a;
     }
-    .logo-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .logo-dot {
-      width: 8px; height: 8px;
-      background: #e74c3c;
-      border-radius: 50%;
-    }
-    .logo-text {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: #6470a8;
-    }
-    .app-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.3px;
-    }
+    .logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .logo-dot { width: 8px; height: 8px; background: var(--line-color); border-radius: 50%; }
+    .logo-text { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #6470a8; }
+    .app-title { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
 
     /* Street card */
     .street-card {
@@ -71,111 +52,101 @@
     }
     .street-badge {
       display: inline-block;
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      background: rgba(231,76,60,0.15);
-      color: #e74c3c;
-      border: 1px solid rgba(231,76,60,0.3);
-      border-radius: 4px;
-      padding: 2px 7px;
-      margin-bottom: 7px;
+      font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+      background: rgba(231,76,60,0.15); color: #e74c3c;
+      border: 1px solid rgba(231,76,60,0.3); border-radius: 4px;
+      padding: 2px 7px; margin-bottom: 7px;
     }
-    .street-name {
-      font-size: 19px;
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -0.4px;
-      margin-bottom: 3px;
-    }
-    .street-meta {
-      font-size: 11px;
-      color: #6470a8;
-    }
+    .street-name { font-size: 19px; font-weight: 800; color: #fff; letter-spacing: -0.4px; margin-bottom: 3px; }
+    .street-meta { font-size: 11px; color: #6470a8; }
 
     /* Stats */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      padding: 14px;
-    }
-    .stat-card {
-      background: #1c2040;
-      border-radius: 8px;
-      padding: 10px 8px;
-      border: 1px solid #232645;
-      text-align: center;
-    }
-    .stat-value {
-      font-size: 16px;
-      font-weight: 800;
-      color: #7c8fd8;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .stat-label {
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #6470a8;
-    }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
+    .stat-card { background: #1c2040; border-radius: 8px; padding: 10px 8px; border: 1px solid #232645; text-align: center; }
+    .stat-value { font-size: 16px; font-weight: 800; color: #7c8fd8; line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #6470a8; }
 
     /* Section title */
     .section-title {
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #6470a8;
-      padding: 0 14px;
-      margin: 6px 0 8px;
+      font-size: 9px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+      color: #6470a8; padding: 0 14px; margin: 6px 0 8px;
     }
 
     /* Toggle */
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 7px 14px;
-    }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; }
     .toggle-label { font-size: 12px; color: #a0aec0; }
     .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
     .toggle input { display: none; }
-    .toggle-slider {
-      position: absolute; inset: 0;
-      background: #232645;
-      border-radius: 18px;
-      cursor: pointer;
-      transition: .2s;
-    }
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      width: 12px; height: 12px;
-      left: 3px; top: 3px;
-      background: white;
-      border-radius: 50%;
-      transition: .2s;
-    }
-    .toggle input:checked + .toggle-slider { background: #e74c3c; }
+    .toggle-slider { position: absolute; inset: 0; background: #232645; border-radius: 18px; cursor: pointer; transition: .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s; }
+    .toggle input:checked + .toggle-slider { background: var(--line-color); }
     .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* Slider row */
+    .slider-row {
+      padding: 4px 14px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-row.hidden { display: none; }
+    .slider-label { font-size: 11px; color: #6470a8; flex-shrink: 0; width: 68px; }
+    .slider-row input[type=range] {
+      flex: 1;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #232645;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--line-color);
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    .slider-val { font-size: 11px; font-weight: 700; color: #7c8fd8; min-width: 38px; text-align: right; }
+
+    /* Color picker */
+    .color-row {
+      padding: 4px 14px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .color-row-label { font-size: 11px; color: #6470a8; width: 100%; margin-bottom: 4px; }
+    .swatch {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      flex-shrink: 0;
+    }
+    .swatch:hover { transform: scale(1.2); }
+    .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+    input[type=color]#custom-color {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid #232645;
+      padding: 0;
+      cursor: pointer;
+      background: none;
+      outline: none;
+      overflow: hidden;
+    }
+    input[type=color]#custom-color::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type=color]#custom-color::-webkit-color-swatch { border: none; border-radius: 50%; }
 
     /* Buttons */
     .btn {
-      display: block;
-      width: calc(100% - 28px);
-      margin: 0 14px 7px;
-      padding: 9px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all .15s;
-      letter-spacing: 0.2px;
+      display: block; width: calc(100% - 28px); margin: 0 14px 7px;
+      padding: 9px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+      cursor: pointer; border: none; transition: all .15s; letter-spacing: 0.2px;
     }
     .btn-red { background: #e74c3c; color: #fff; }
     .btn-red:hover { background: #c0392b; }
@@ -183,58 +154,21 @@
     .btn-dark:hover { background: #232645; }
     .btn-ghost { background: transparent; color: #6470a8; border: 1px solid #232645; }
     .btn-ghost:hover { color: #e2e8f0; background: #1c2040; }
+    .btn-green { background: #1e4d3a; color: #2ecc71; border: 1px solid #2a6b50; }
+    .btn-green:hover { background: #27ae60; color: #fff; }
 
     /* Instruction card */
-    .instructions-card {
-      margin: 0 14px 14px;
-      background: #1c2040;
-      border-radius: 10px;
-      padding: 12px 14px;
-      border: 1px solid #232645;
-    }
-    .instructions-card h4 {
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: #7c8fd8;
-      margin-bottom: 10px;
-    }
-    .instr {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 11px;
-      color: #8892b0;
-      line-height: 1.5;
-    }
+    .instructions-card { margin: 0 14px 14px; background: #1c2040; border-radius: 10px; padding: 12px 14px; border: 1px solid #232645; }
+    .instructions-card h4 { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #7c8fd8; margin-bottom: 10px; }
+    .instr { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: 11px; color: #8892b0; line-height: 1.5; }
     .instr-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
     .instr strong { color: #c5cef0; }
 
-    /* Spacer */
     .spacer { flex: 1; }
 
     /* Status bar */
-    #status-bar {
-      margin: 0 14px 14px;
-      padding: 9px 11px;
-      background: #1c2040;
-      border-radius: 8px;
-      border: 1px solid #232645;
-      font-size: 11px;
-      color: #6470a8;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #status-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #f39c12;
-      flex-shrink: 0;
-      animation: blink 1.4s ease-in-out infinite;
-    }
+    #status-bar { margin: 0 14px 14px; padding: 9px 11px; background: #1c2040; border-radius: 8px; border: 1px solid #232645; font-size: 11px; color: #6470a8; display: flex; align-items: center; gap: 8px; }
+    #status-dot { width: 7px; height: 7px; border-radius: 50%; background: #f39c12; flex-shrink: 0; animation: blink 1.4s ease-in-out infinite; }
     #status-dot.ready { background: #2ecc71; animation: none; }
     #status-dot.error { background: #e74c3c; animation: none; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
@@ -242,120 +176,42 @@
     /* ── MAP ── */
     #map { flex: 1; position: relative; }
 
-    /* Leaflet customizations */
-    .leaflet-control-zoom a {
-      background: #13162b !important;
-      color: #e2e8f0 !important;
-      border-color: #232645 !important;
-    }
-    .leaflet-control-zoom a:hover {
-      background: #1c2040 !important;
-    }
+    .leaflet-control-zoom a { background: #13162b !important; color: #e2e8f0 !important; border-color: #232645 !important; }
+    .leaflet-control-zoom a:hover { background: #1c2040 !important; }
 
-    /* Anchor handles */
+    /* Anchor handles — colour via CSS variable */
     .anchor-handle {
       background: #fff;
-      border: 2.5px solid #e74c3c;
+      border: 2.5px solid var(--line-color);
       border-radius: 50%;
       cursor: grab !important;
       box-shadow: 0 1px 5px rgba(0,0,0,.5);
       transition: transform .1s, box-shadow .1s;
     }
-    .anchor-handle:hover {
-      transform: scale(1.55);
-      border-color: #c0392b;
-      box-shadow: 0 2px 10px rgba(231,76,60,.45);
-    }
-    .anchor-handle.endpoint {
-      background: #ffd700;
-      border-color: #e67e22;
-    }
+    .anchor-handle:hover { transform: scale(1.55); box-shadow: 0 2px 10px rgba(231,76,60,.45); }
+    .anchor-handle.endpoint { background: #ffd700; border-color: #e67e22; }
 
-    .handle-tooltip {
-      background: #13162b !important;
-      border: 1px solid #232645 !important;
-      border-radius: 6px !important;
-      color: #e2e8f0 !important;
-      font-size: 11px !important;
-      padding: 5px 8px !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,.4) !important;
-    }
+    .handle-tooltip { background: #13162b !important; border: 1px solid #232645 !important; border-radius: 6px !important; color: #e2e8f0 !important; font-size: 11px !important; padding: 5px 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,.4) !important; }
     .handle-tooltip::before { display: none !important; }
 
     /* Loading overlay */
-    #loading {
-      position: absolute; inset: 0;
-      background: rgba(13,15,26,.75);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 800;
-      backdrop-filter: blur(6px);
-    }
+    #loading { position: absolute; inset: 0; background: rgba(13,15,26,.75); display: flex; align-items: center; justify-content: center; z-index: 800; backdrop-filter: blur(6px); }
     #loading.hidden { display: none; }
-    .loading-box {
-      background: #13162b;
-      border: 1px solid #232645;
-      border-radius: 16px;
-      padding: 36px 32px;
-      text-align: center;
-      width: 280px;
-    }
-    .spinner {
-      width: 38px; height: 38px;
-      border: 3px solid #232645;
-      border-top-color: #e74c3c;
-      border-radius: 50%;
-      animation: spin .75s linear infinite;
-      margin: 0 auto 16px;
-    }
+    .loading-box { background: #13162b; border: 1px solid #232645; border-radius: 16px; padding: 36px 32px; text-align: center; width: 280px; }
+    .spinner { width: 38px; height: 38px; border: 3px solid #232645; border-top-color: var(--line-color); border-radius: 50%; animation: spin .75s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
     .loading-desc { font-size: 12px; color: #6470a8; line-height: 1.5; }
 
     /* Context menu */
-    #ctx-menu {
-      position: fixed;
-      background: #13162b;
-      border: 1px solid #2d3252;
-      border-radius: 9px;
-      padding: 5px;
-      min-width: 210px;
-      box-shadow: 0 8px 28px rgba(0,0,0,.6);
-      z-index: 99999;
-      font-size: 13px;
-    }
+    #ctx-menu { position: fixed; background: #13162b; border: 1px solid #2d3252; border-radius: 9px; padding: 5px; min-width: 215px; box-shadow: 0 8px 28px rgba(0,0,0,.6); z-index: 99999; font-size: 13px; }
     #ctx-menu.hidden { display: none; }
-    .ctx-item {
-      padding: 9px 13px;
-      cursor: pointer;
-      border-radius: 6px;
-      color: #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .ctx-item { padding: 9px 13px; cursor: pointer; border-radius: 6px; color: #e2e8f0; display: flex; align-items: center; gap: 10px; }
     .ctx-item:hover { background: #232645; }
     .ctx-item.danger { color: #e74c3c; }
     .ctx-item.danger:hover { background: rgba(231,76,60,.12); }
     .ctx-sep { height: 1px; background: #232645; margin: 4px 0; }
-    .ctx-label {
-      padding: 5px 13px 3px;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: #6470a8;
-    }
-
-    /* Tooltip for line hover */
-    .line-tooltip {
-      background: #13162b !important;
-      border: 1px solid #232645 !important;
-      border-radius: 6px !important;
-      color: #8892b0 !important;
-      font-size: 11px !important;
-    }
+    .ctx-label { padding: 5px 13px 3px; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #6470a8; }
   </style>
 </head>
 <body>
@@ -379,29 +235,29 @@
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-len">—</div>
-        <div class="stat-label">Longueur</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-handles">—</div>
-        <div class="stat-label">Poignées</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-seg">—</div>
-        <div class="stat-label">Segments</div>
-      </div>
+      <div class="stat-card"><div class="stat-value" id="stat-len">—</div><div class="stat-label">Longueur</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-handles">—</div><div class="stat-label">Poignées</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-seg">—</div><div class="stat-label">Segments</div></div>
     </div>
 
     <div class="section-title">Affichage</div>
 
+    <!-- Buffer toggle + slider -->
     <div class="toggle-row">
-      <span class="toggle-label">Zone tampon géofencing (±30 m)</span>
+      <span class="toggle-label">Zone tampon géofencing</span>
       <label class="toggle">
         <input type="checkbox" id="toggle-buffer" onchange="toggleBuffer(this.checked)">
         <span class="toggle-slider"></span>
       </label>
     </div>
+    <div class="slider-row hidden" id="buf-slider-row">
+      <span class="slider-label">Largeur</span>
+      <input type="range" id="buf-width" min="1" max="200" value="30" step="1"
+             oninput="updateBufWidth(this.value)">
+      <span class="slider-val" id="buf-width-val">30 m</span>
+    </div>
+
+    <!-- Numbers toggle -->
     <div class="toggle-row">
       <span class="toggle-label">Numéros des poignées</span>
       <label class="toggle">
@@ -410,30 +266,34 @@
       </label>
     </div>
 
-    <div class="section-title" style="margin-top:10px">Actions</div>
-    <button class="btn btn-red" onclick="exportGeoJSON()">⬇&nbsp; Exporter GeoJSON</button>
+    <!-- Color picker -->
+    <div class="color-row">
+      <span class="color-row-label">Couleur de la ligne</span>
+      <button class="swatch active" style="background:#e74c3c" data-color="#e74c3c" onclick="setLineColor('#e74c3c',this)" title="Rouge"></button>
+      <button class="swatch" style="background:#3498db" data-color="#3498db" onclick="setLineColor('#3498db',this)" title="Bleu"></button>
+      <button class="swatch" style="background:#27ae60" data-color="#27ae60" onclick="setLineColor('#27ae60',this)" title="Vert"></button>
+      <button class="swatch" style="background:#f39c12" data-color="#f39c12" onclick="setLineColor('#f39c12',this)" title="Jaune"></button>
+      <button class="swatch" style="background:#9b59b6" data-color="#9b59b6" onclick="setLineColor('#9b59b6',this)" title="Violet"></button>
+      <button class="swatch" style="background:#1abc9c" data-color="#1abc9c" onclick="setLineColor('#1abc9c',this)" title="Turquoise"></button>
+      <input type="color" id="custom-color" value="#e74c3c" onchange="setLineColor(this.value,null)" title="Couleur personnalisée">
+    </div>
+
+    <div class="section-title" style="margin-top:4px">Actions</div>
+
+    <!-- Hidden file input for JSON import -->
+    <input type="file" id="json-file-input" accept=".json,.geojson" style="display:none" onchange="importJSON(event)">
+    <button class="btn btn-green" onclick="document.getElementById('json-file-input').click()">↑&nbsp; Importer un fichier JSON</button>
+    <button class="btn btn-red"  onclick="exportGeoJSON()">⬇&nbsp; Exporter GeoJSON</button>
     <button class="btn btn-dark" onclick="resetLine()">↺&nbsp; Réinitialiser la ligne</button>
     <button class="btn btn-ghost" onclick="fitStreet()">⛶&nbsp; Recentrer la vue</button>
 
-    <div class="section-title" style="margin-top:10px">Mode d'emploi</div>
+    <div class="section-title" style="margin-top:6px">Mode d'emploi</div>
     <div class="instructions-card">
       <h4>Édition interactive</h4>
-      <div class="instr">
-        <span class="instr-icon">⊙</span>
-        <span><strong>Glisser</strong> une poignée blanche pour la repositionner</span>
-      </div>
-      <div class="instr">
-        <span class="instr-icon">✚</span>
-        <span><strong>Clic droit sur la ligne</strong> rouge → insérer une nouvelle poignée</span>
-      </div>
-      <div class="instr">
-        <span class="instr-icon">✕</span>
-        <span><strong>Clic droit sur une poignée</strong> → options de suppression</span>
-      </div>
-      <div class="instr">
-        <span class="instr-icon">●</span>
-        <span>Les <strong>extrémités</strong> (poignées dorées) marquent le début et la fin de la rue</span>
-      </div>
+      <div class="instr"><span class="instr-icon">⊙</span><span><strong>Glisser</strong> une poignée pour la repositionner</span></div>
+      <div class="instr"><span class="instr-icon">✚</span><span><strong>Clic droit sur la ligne</strong> rouge → insérer une poignée</span></div>
+      <div class="instr"><span class="instr-icon">✕</span><span><strong>Clic droit sur une poignée</strong> → supprimer</span></div>
+      <div class="instr"><span class="instr-icon">●</span><span>Poignées <strong>dorées</strong> = extrémités de la rue</span></div>
     </div>
 
     <div class="spacer"></div>
@@ -450,82 +310,63 @@
       <div class="loading-box">
         <div class="spinner"></div>
         <div class="loading-title">Chargement en cours…</div>
-        <div class="loading-desc">Récupération des données OpenStreetMap pour la Rue de Rivoli. Cela peut prendre quelques secondes.</div>
+        <div class="loading-desc">Récupération des données OpenStreetMap pour la Rue de Rivoli…</div>
       </div>
     </div>
   </div>
-
 </div>
 
 <!-- Context Menu -->
 <div id="ctx-menu" class="hidden">
   <div class="ctx-label" id="ctx-title">Action</div>
-  <div class="ctx-item" id="ctx-add" onclick="ctxAdd()">
-    <span>➕</span> Ajouter une poignée ici
-  </div>
+  <div class="ctx-item" id="ctx-add"  onclick="ctxAdd()"><span>➕</span> Ajouter une poignée ici</div>
   <div class="ctx-sep" id="ctx-sep-1"></div>
-  <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()">
-    <span>🗑</span> Supprimer cette poignée
-  </div>
+  <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()"><span>🗑</span> Supprimer cette poignée</div>
   <div class="ctx-sep"></div>
-  <div class="ctx-item" onclick="closeCtx()">
-    <span style="color:#6470a8">✕</span> Annuler
-  </div>
+  <div class="ctx-item" onclick="closeCtx()"><span style="color:#6470a8">✕</span> Annuler</div>
 </div>
 
-<!-- Leaflet -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
 <script>
 'use strict';
 
 // ═══════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════
-let map, polyline, bufferLayer;
-let markers   = [];       // L.Marker[]  (anchor handles)
-let origPts   = null;     // backup {lat,lon}[] for reset
-let showBuf   = false;
-let showNums  = false;
-let ctxState  = { mode: null, idx: -1, latlng: null };
+let map, polyline, hitPolyline, bufferLayer;
+let markers    = [];
+let origPts    = null;
+let showBuf    = false;
+let showNums   = false;
+let bufferWidth = 30;
+let lineColor  = '#e74c3c';
+let ctxState   = { mode: null, idx: -1, latlng: null };
 
 // ═══════════════════════════════════════════════════
 //  MAP INIT
 // ═══════════════════════════════════════════════════
-map = L.map('map', {
-  zoomControl: false,
-  center: [48.8600, 2.340],
-  zoom: 14
-});
-
+map = L.map('map', { zoomControl: false, center: [48.8610, 2.340], zoom: 14 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// Carto Voyager – clean, modern look
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  subdomains: 'abcd',
-  maxZoom: 20
+  subdomains: 'abcd', maxZoom: 20
 }).addTo(map);
 
-// Close context menu on map click
 map.on('click', closeCtx);
-map.on('contextmenu', (e) => { e.originalEvent.preventDefault(); });
+map.on('contextmenu', (e) => e.originalEvent.preventDefault());
 
 // ═══════════════════════════════════════════════════
 //  GEOMETRY HELPERS
 // ═══════════════════════════════════════════════════
-
-/** Haversine distance in metres */
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
-  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-  const a  = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+  const Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-/** Total length of a {lat,lon}[] path in metres */
 function pathLen(pts) {
   let d = 0;
   for (let i = 1; i < pts.length; i++)
@@ -533,217 +374,191 @@ function pathLen(pts) {
   return d;
 }
 
-/** Point-to-segment distance (degrees, for nearest-segment search) */
 function ptSegDist(px, py, ax, ay, bx, by) {
-  const dx = bx-ax, dy = by-ay;
+  const dx=bx-ax, dy=by-ay;
   if (!dx && !dy) return Math.hypot(px-ax, py-ay);
-  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / (dx*dx+dy*dy)));
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
   return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
 }
 
 // ═══════════════════════════════════════════════════
-//  OSM WAY → ORDERED POLYLINE
+//  OSM WAY MERGING
 // ═══════════════════════════════════════════════════
-
-/** Merge a set of OSM way segments (each with .geometry[{lat,lon}]) into an ordered path */
 function mergeWays(ways) {
   if (!ways.length) return [];
-  if (ways.length === 1) return ways[0].geometry.map(n => ({lat:n.lat,lon:n.lon}));
+  if (ways.length === 1) return ways[0].geometry.map(n=>({lat:n.lat,lon:n.lon}));
 
-  const TOL = 0.00015;  // ~12 m
+  const TOL = 0.00015;
   const snap = v => Math.round(v/TOL)*TOL;
   const key  = (lat,lon) => `${snap(lat)},${snap(lon)}`;
 
-  const adj    = new Map();
-  const wayMap = new Map();
-
+  const adj = new Map(), wayMap = new Map();
   for (const w of ways) {
     wayMap.set(w.id, w);
-    const g    = w.geometry;
-    const kF   = key(g[0].lat, g[0].lon);
-    const kL   = key(g[g.length-1].lat, g[g.length-1].lon);
-    if (!adj.has(kF)) adj.set(kF, []);
-    if (!adj.has(kL)) adj.set(kL, []);
-    adj.get(kF).push({ id: w.id, rev: false });
-    adj.get(kL).push({ id: w.id, rev: true  });
+    const g = w.geometry;
+    const kF = key(g[0].lat,g[0].lon), kL = key(g[g.length-1].lat,g[g.length-1].lon);
+    if (!adj.has(kF)) adj.set(kF,[]);
+    if (!adj.has(kL)) adj.set(kL,[]);
+    adj.get(kF).push({id:w.id,rev:false});
+    adj.get(kL).push({id:w.id,rev:true});
   }
 
-  // Find westernmost dead-end (single-way endpoint) as starting point
   let startEntry = null, minLon = Infinity;
-  for (const [k, entries] of adj) {
-    const uniqIds = new Set(entries.map(e=>e.id));
-    if (uniqIds.size === 1) {
+  for (const [k,entries] of adj) {
+    const uniq = new Set(entries.map(e=>e.id));
+    if (uniq.size === 1) {
       const lon = parseFloat(k.split(',')[1]);
-      if (lon < minLon) { minLon = lon; startEntry = entries[0]; }
+      if (lon < minLon) { minLon=lon; startEntry=entries[0]; }
     }
   }
+  if (!startEntry) startEntry = {id:ways[0].id,rev:false};
 
-  // Fallback: just pick first way forward
-  if (!startEntry) startEntry = { id: ways[0].id, rev: false };
-
-  const visited = new Set();
-  const path    = [];
-  let cur       = startEntry;
-
+  const visited=new Set(), path=[];
+  let cur = startEntry;
   while (cur && !visited.has(cur.id)) {
-    const w     = wayMap.get(cur.id);
-    if (!w) break;
+    const w = wayMap.get(cur.id); if (!w) break;
     visited.add(w.id);
-    const nodes = (cur.rev ? [...w.geometry].reverse() : w.geometry)
-                  .map(n => ({lat:n.lat,lon:n.lon}));
+    const nodes = (cur.rev ? [...w.geometry].reverse() : w.geometry).map(n=>({lat:n.lat,lon:n.lon}));
     path.push(...(path.length ? nodes.slice(1) : nodes));
-
-    const last   = path[path.length-1];
-    const lastKey = key(last.lat, last.lon);
-    const nexts  = adj.get(lastKey) || [];
-    cur = nexts.find(e => !visited.has(e.id)) || null;
+    const last = path[path.length-1];
+    const nexts = adj.get(key(last.lat,last.lon)) || [];
+    cur = nexts.find(e=>!visited.has(e.id)) || null;
   }
 
-  // Append any remaining unvisited ways (may happen with disconnected segments)
-  const remaining = ways.filter(w => !visited.has(w.id));
-  if (remaining.length) {
-    remaining.sort((a,b) => {
-      const last = path[path.length-1];
-      return haversine(last.lat,last.lon,a.geometry[0].lat,a.geometry[0].lon)
-           - haversine(last.lat,last.lon,b.geometry[0].lat,b.geometry[0].lon);
-    });
-    for (const w of remaining) {
-      const geom  = w.geometry.map(n=>({lat:n.lat,lon:n.lon}));
-      const last  = path[path.length-1];
-      const dF    = haversine(last.lat,last.lon,geom[0].lat,geom[0].lon);
-      const dL    = haversine(last.lat,last.lon,geom[geom.length-1].lat,geom[geom.length-1].lon);
-      if (dL < dF) geom.reverse();
-      path.push(...geom.slice(1));
-    }
+  // Append remaining disconnected ways
+  const remaining = ways.filter(w=>!visited.has(w.id));
+  for (const w of remaining.sort((a,b)=>{
+    const l=path[path.length-1];
+    return haversine(l.lat,l.lon,a.geometry[0].lat,a.geometry[0].lon)
+          -haversine(l.lat,l.lon,b.geometry[0].lat,b.geometry[0].lon);
+  })) {
+    const g = w.geometry.map(n=>({lat:n.lat,lon:n.lon}));
+    const l = path[path.length-1];
+    if (haversine(l.lat,l.lon,g[g.length-1].lat,g[g.length-1].lon) < haversine(l.lat,l.lon,g[0].lat,g[0].lon)) g.reverse();
+    path.push(...g.slice(1));
   }
-
   return path;
 }
 
-/** Place an anchor point every `interval` metres along `path` */
-function resample(path, interval = 100) {
+/**
+ * Resample path: one anchor every `interval` metres.
+ * Also always keeps wayBoundary nodes (= intersections).
+ */
+function resample(path, interval=100, boundaryKeys=new Set()) {
   if (!path.length) return [];
-  const out  = [{ ...path[0] }];
-  let over   = 0;  // distance into current gap since last anchor
-
-  for (let i = 1; i < path.length; i++) {
+  const snap = v=>Math.round(v/0.0001)*0.0001;
+  const key  = p=>`${snap(p.lat)},${snap(p.lon)}`;
+  const out  = [{...path[0]}];
+  let over   = 0;
+  for (let i=1; i<path.length; i++) {
     const segLen = haversine(path[i-1].lat,path[i-1].lon,path[i].lat,path[i].lon);
-    let pos      = interval - over;   // position within segment of next anchor
+    const isBoundary = boundaryKeys.has(key(path[i]));
+    let pos = interval - over;
     while (pos <= segLen) {
-      const t = pos / segLen;
+      const t = pos/segLen;
       out.push({
-        lat: path[i-1].lat + t*(path[i].lat - path[i-1].lat),
-        lon: path[i-1].lon + t*(path[i].lon - path[i-1].lon)
+        lat: path[i-1].lat + t*(path[i].lat-path[i-1].lat),
+        lon: path[i-1].lon + t*(path[i].lon-path[i-1].lon)
       });
       pos += interval;
     }
-    over = segLen - (pos - interval);
+    over = segLen - (pos-interval);
+    // Force a boundary anchor at this node even if not on the 100m grid
+    if (isBoundary && segLen > 5) {
+      const prev = out[out.length-1];
+      if (haversine(prev.lat,prev.lon,path[i].lat,path[i].lon) > 10) {
+        out.push({...path[i]});
+        over = 0;
+      }
+    }
   }
-
-  // Always include the last point of the street
-  const last = path[path.length-1];
-  const prev = out[out.length-1];
-  if (haversine(prev.lat,prev.lon,last.lat,last.lon) > 5)
-    out.push({ ...last });
-
+  const last=path[path.length-1], prev=out[out.length-1];
+  if (haversine(prev.lat,prev.lon,last.lat,last.lon) > 5) out.push({...last});
   return out;
 }
 
 // ═══════════════════════════════════════════════════
 //  OVERPASS FETCH
 // ═══════════════════════════════════════════════════
-
 async function loadStreet() {
-  setStatus('Connexion à OpenStreetMap…', 'loading');
+  setStatus('Connexion à OpenStreetMap…','loading');
 
+  // Query: primary + secondary only, within Paris bbox
   const query = `[out:json][timeout:60];
 (
-  way["name"="Rue de Rivoli"]
-     ["highway"~"^(primary|secondary|tertiary|residential|unclassified|living_street)$"]
-     (48.850,2.310,48.870,2.370);
+  way["name"="Rue de Rivoli"]["highway"~"^(primary|secondary)$"](48.850,2.310,48.872,2.375);
 );
 out geom;`;
 
   try {
     const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method : 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body   : 'data=' + encodeURIComponent(query)
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'data='+encodeURIComponent(query)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
-    const ways = json.elements.filter(e =>
-      e.type === 'way' && e.tags && e.geometry?.length >= 2
-    );
+    const ways = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
+    if (!ways.length) throw new Error('Aucun segment primary/secondary reçu');
 
-    if (!ways.length) throw new Error('Aucun segment reçu');
+    setStatus(`${ways.length} segments OSM — fusion…`,'loading');
 
-    setStatus(`${ways.length} segments OSM reçus — fusion…`, 'loading');
+    // Collect way-endpoint keys (= intersections)
+    const snap = v=>Math.round(v/0.0001)*0.0001;
+    const bKeys = new Set();
+    ways.forEach(w => {
+      const g=w.geometry;
+      [g[0], g[g.length-1]].forEach(n => bKeys.add(`${snap(n.lat)},${snap(n.lon)}`));
+    });
 
     const raw     = mergeWays(ways);
-    const anchors = resample(raw, 100);
+    const anchors = resample(raw, 100, bKeys);
 
-    origPts = anchors.map(p => ({...p}));
+    origPts = anchors.map(p=>({...p}));
     buildLine(anchors);
     document.getElementById('loading').classList.add('hidden');
-    setStatus(`Prêt — ${anchors.length} poignées d'accroche`, 'ready');
-    fitStreet();
-    updateStats();
+    setStatus(`Prêt — ${anchors.length} poignées (carrefours + 100 m)`,'ready');
+    fitStreet(); updateStats();
 
   } catch(err) {
-    console.warn('Overpass failed, using fallback:', err);
+    console.warn('Overpass failed:', err);
     document.getElementById('loading').classList.add('hidden');
-    setStatus('Données OSM indisponibles — coordonnées de secours utilisées', 'error');
-
-    const fallback = getFallback();
-    origPts = fallback.map(p => ({...p}));
-    buildLine(fallback);
-    fitStreet();
-    updateStats();
+    setStatus('Données OSM indisponibles — coordonnées OSM embarquées utilisées','error');
+    const fb = getFallback();
+    origPts = fb.map(p=>({...p}));
+    buildLine(fb); fitStreet(); updateStats();
   }
 }
 
 // ═══════════════════════════════════════════════════
 //  LINE & MARKERS
 // ═══════════════════════════════════════════════════
-
 function makeIcon(isEndpoint) {
   const sz = isEndpoint ? 16 : 12;
-  return L.divIcon({
-    className : 'anchor-handle' + (isEndpoint ? ' endpoint' : ''),
-    iconSize  : [sz, sz],
-    iconAnchor: [sz/2, sz/2]
-  });
+  return L.divIcon({ className:'anchor-handle'+(isEndpoint?' endpoint':''), iconSize:[sz,sz], iconAnchor:[sz/2,sz/2] });
 }
 
 function buildLine(pts) {
   clearAll();
+  const lls = pts.map(p=>[p.lat,p.lon]);
 
-  polyline = L.polyline(pts.map(p=>[p.lat,p.lon]), {
-    color      : '#e74c3c',
-    weight     : 4,
-    opacity    : 0.88,
-    smoothFactor: 0.5,
-    interactive: true
-  }).addTo(map);
+  // Invisible wider polyline for easier right-click detection
+  hitPolyline = L.polyline(lls, { color:'transparent', weight:18, opacity:0, interactive:true }).addTo(map);
+  hitPolyline.on('contextmenu', onLineRightClick);
 
-  // Right-click on the line itself
-  polyline.on('contextmenu', onLineRightClick);
+  // Visible red line
+  polyline = L.polyline(lls, { color:lineColor, weight:4, opacity:0.9, smoothFactor:0.5, interactive:false }).addTo(map);
 
-  pts.forEach((p, i) => spawnMarker(p, i));
+  pts.forEach((p,i) => spawnMarker(p,i));
   refreshEndpoints();
 }
 
 function spawnMarker(pt, idx) {
-  const isEnd = (idx === 0 || idx === markers.length);
-  const m     = L.marker([pt.lat, pt.lon], {
-    draggable    : true,
-    icon         : makeIcon(isEnd),
-    zIndexOffset : 200
+  const m = L.marker([pt.lat, pt.lon], {
+    draggable:true, icon:makeIcon(false), zIndexOffset:200
   });
-
-  m.bindTooltip('', { direction:'top', className:'handle-tooltip', opacity:1 });
+  m.bindTooltip('', {direction:'top', className:'handle-tooltip', opacity:1});
 
   m.on('drag', () => {
     refreshPolyline();
@@ -752,7 +567,7 @@ function spawnMarker(pt, idx) {
   });
   m.on('dragend', updateStats);
 
-  m.on('contextmenu', (e) => {
+  m.on('contextmenu', e => {
     L.DomEvent.stopPropagation(e);
     openCtx(e.originalEvent, 'marker', markers.indexOf(m), null);
   });
@@ -763,130 +578,175 @@ function spawnMarker(pt, idx) {
 }
 
 function refreshPolyline() {
-  if (polyline) polyline.setLatLngs(markers.map(m => m.getLatLng()));
+  const lls = markers.map(m=>m.getLatLng());
+  if (polyline)    polyline.setLatLngs(lls);
+  if (hitPolyline) hitPolyline.setLatLngs(lls);
 }
 
 function refreshEndpoints() {
-  markers.forEach((m, i) => {
-    const ep = (i === 0 || i === markers.length-1);
-    m.setIcon(makeIcon(ep));
-  });
-  markers.forEach((m,i) => updateTooltip(m, i));
+  markers.forEach((m,i) => m.setIcon(makeIcon(i===0 || i===markers.length-1)));
+  markers.forEach((m,i) => updateTooltip(m,i));
 }
 
 function updateTooltip(m, i) {
-  const ll   = m.getLatLng();
-  const ep   = (i === 0 || i === markers.length-1);
-  const lbl  = ep ? (i === 0 ? '🟡 Début de rue' : '🟡 Fin de rue') : `Poignée #${i+1}`;
-  const nums = showNums ? `<br><span style="color:#6470a8">${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}</span>` : '';
-  m.setTooltipContent(`<b>${lbl}</b>${nums}`);
+  const ll  = m.getLatLng();
+  const ep  = (i===0 || i===markers.length-1);
+  const lbl = ep ? (i===0?'🟡 Début':'🟡 Fin') : `Poignée #${i+1}`;
+  const geo = showNums ? `<br><span style="color:#6470a8">${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}</span>` : '';
+  m.setTooltipContent(`<b>${lbl}</b>${geo}`);
 }
 
 function clearAll() {
-  if (polyline)   { polyline.remove(); polyline = null; }
-  if (bufferLayer){ bufferLayer.remove(); bufferLayer = null; }
-  markers.forEach(m => m.remove());
-  markers = [];
+  if (hitPolyline) { hitPolyline.remove(); hitPolyline=null; }
+  if (polyline)    { polyline.remove();    polyline=null; }
+  if (bufferLayer) { bufferLayer.remove(); bufferLayer=null; }
+  markers.forEach(m=>m.remove()); markers=[];
 }
 
 // ═══════════════════════════════════════════════════
-//  BUFFER (GEOFENCING ZONE)
+//  BUFFER
 // ═══════════════════════════════════════════════════
-
 function toggleBuffer(on) {
   showBuf = on;
-  if (on) renderBuffer();
-  else if (bufferLayer) { bufferLayer.remove(); bufferLayer = null; }
+  document.getElementById('buf-slider-row').classList.toggle('hidden', !on);
+  if (on) renderBuffer(); else if (bufferLayer) { bufferLayer.remove(); bufferLayer=null; }
 }
 
-function renderBuffer(radiusM = 30) {
-  if (bufferLayer) { bufferLayer.remove(); bufferLayer = null; }
+function updateBufWidth(val) {
+  bufferWidth = parseInt(val);
+  document.getElementById('buf-width-val').textContent = val+' m';
+  if (showBuf) renderBuffer();
+}
+
+function renderBuffer() {
+  if (bufferLayer) { bufferLayer.remove(); bufferLayer=null; }
   if (!showBuf || markers.length < 2) return;
-
-  const lls   = markers.map(m => m.getLatLng());
+  const lls   = markers.map(m=>m.getLatLng());
   const polys = [];
-
-  for (let i = 0; i < lls.length-1; i++) {
-    const a    = lls[i], b = lls[i+1];
-    const latR = radiusM / 111320;
-    const lngR = radiusM / (111320 * Math.cos(a.lat * Math.PI/180));
-    const dx   = b.lng - a.lng, dy = b.lat - a.lat;
-    const len  = Math.hypot(dx, dy);
+  for (let i=0; i<lls.length-1; i++) {
+    const a=lls[i], b=lls[i+1];
+    const latR = bufferWidth/111320;
+    const lngR = bufferWidth/(111320*Math.cos(a.lat*Math.PI/180));
+    const dx=b.lng-a.lng, dy=b.lat-a.lat, len=Math.hypot(dx,dy);
     if (!len) continue;
-    const nx = (-dy/len)*lngR, ny = (dx/len)*latR;
-
+    const nx=(-dy/len)*lngR, ny=(dx/len)*latR;
     polys.push([[
-      [a.lng+nx, a.lat+ny], [b.lng+nx, b.lat+ny],
-      [b.lng-nx, b.lat-ny], [a.lng-nx, a.lat-ny],
-      [a.lng+nx, a.lat+ny]
+      [a.lng+nx,a.lat+ny],[b.lng+nx,b.lat+ny],
+      [b.lng-nx,b.lat-ny],[a.lng-nx,a.lat-ny],
+      [a.lng+nx,a.lat+ny]
     ]]);
   }
-
   bufferLayer = L.geoJSON({
-    type    : 'FeatureCollection',
-    features: polys.map(c => ({ type:'Feature', geometry:{ type:'Polygon', coordinates:c } }))
-  }, {
-    style: { color:'#e74c3c', weight:0, fillColor:'#e74c3c', fillOpacity:0.15 }
-  }).addTo(map);
-
+    type:'FeatureCollection',
+    features:polys.map(c=>({type:'Feature',geometry:{type:'Polygon',coordinates:c}}))
+  }, { style:{color:lineColor,weight:0,fillColor:lineColor,fillOpacity:0.15} }).addTo(map);
   bufferLayer.bringToBack();
-  polyline.bringToFront();
+  if (polyline) polyline.bringToFront();
+}
+
+// ═══════════════════════════════════════════════════
+//  COLOUR
+// ═══════════════════════════════════════════════════
+function setLineColor(color, btn) {
+  lineColor = color;
+  document.documentElement.style.setProperty('--line-color', color);
+  document.getElementById('custom-color').value = color;
+  if (polyline) polyline.setStyle({color});
+  if (showBuf) renderBuffer();
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════
+//  JSON IMPORT
+// ═══════════════════════════════════════════════════
+function importJSON(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let pts = null;
+
+      // GeoJSON Feature with LineString
+      if (data.type==='Feature' && data.geometry?.type==='LineString') {
+        pts = data.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+      }
+      // GeoJSON FeatureCollection
+      else if (data.type==='FeatureCollection') {
+        const f = data.features?.find(f=>f.geometry?.type==='LineString');
+        if (f) pts = f.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+      }
+      // Raw array of {lat,lon} or {lat,lng}
+      else if (Array.isArray(data)) {
+        pts = data.map(p=>({lat:parseFloat(p.lat), lon:parseFloat(p.lon??p.lng)}));
+      }
+      // Raw coordinates array [[lng,lat],...]
+      else if (Array.isArray(data?.coordinates)) {
+        pts = data.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+      }
+
+      if (!pts || pts.length<2) throw new Error('Format non reconnu ou données insuffisantes');
+      pts = pts.filter(p=>isFinite(p.lat)&&isFinite(p.lon));
+      if (pts.length<2) throw new Error('Coordonnées invalides dans le fichier');
+
+      clearAll();
+      origPts = pts.map(p=>({...p}));
+      buildLine(pts);
+      fitStreet(); updateStats();
+      setStatus(`✓ Importé : ${pts.length} poignées chargées depuis ${file.name}`,'ready');
+    } catch(err) {
+      setStatus('Erreur import : '+err.message,'error');
+      alert('Impossible de lire ce fichier JSON :\n'+err.message);
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value=''; // Allow re-importing same file
 }
 
 // ═══════════════════════════════════════════════════
 //  CONTEXT MENU
 // ═══════════════════════════════════════════════════
-
 function onLineRightClick(e) {
   L.DomEvent.stopPropagation(e);
-  const idx = nearestSegIdx(e.latlng);
-  openCtx(e.originalEvent, 'line', idx, e.latlng);
+  L.DomEvent.preventDefault(e);
+  openCtx(e.originalEvent, 'line', nearestSegIdx(e.latlng), e.latlng);
 }
 
 function nearestSegIdx(latlng) {
-  let best = 1, minD = Infinity;
-  const lls = markers.map(m => m.getLatLng());
-  for (let i = 0; i < lls.length-1; i++) {
-    const d = ptSegDist(
-      latlng.lng, latlng.lat,
-      lls[i].lng, lls[i].lat,
-      lls[i+1].lng, lls[i+1].lat
-    );
-    if (d < minD) { minD = d; best = i+1; }
+  let best=1, minD=Infinity;
+  const lls = markers.map(m=>m.getLatLng());
+  for (let i=0; i<lls.length-1; i++) {
+    const d = ptSegDist(latlng.lng,latlng.lat,lls[i].lng,lls[i].lat,lls[i+1].lng,lls[i+1].lat);
+    if (d<minD) { minD=d; best=i+1; }
   }
   return best;
 }
 
 function openCtx(ev, mode, idx, latlng) {
   ctxState = { mode, idx, latlng };
-  const menu = document.getElementById('ctx-menu');
-  const isLine   = mode === 'line';
-  const isMarker = mode === 'marker';
-
-  document.getElementById('ctx-title').textContent
-    = isLine ? 'Ajouter un point' : `Poignée #${idx+1}`;
-  document.getElementById('ctx-add').style.display  = isLine   ? 'flex' : 'none';
-  document.getElementById('ctx-sep-1').style.display = isLine  ? 'block' : 'none';
-  document.getElementById('ctx-del').style.display  = isMarker ? 'flex' : 'none';
-
+  const menu=document.getElementById('ctx-menu');
+  document.getElementById('ctx-title').textContent = mode==='line' ? 'Ajouter un point' : `Poignée #${idx+1}`;
+  document.getElementById('ctx-add').style.display  = mode==='line'   ? 'flex' : 'none';
+  document.getElementById('ctx-sep-1').style.display= mode==='line'   ? 'block': 'none';
+  document.getElementById('ctx-del').style.display  = mode==='marker' ? 'flex' : 'none';
   menu.classList.remove('hidden');
-  const x = Math.min(ev.clientX, window.innerWidth  - 225);
-  const y = Math.min(ev.clientY, window.innerHeight - 130);
-  menu.style.left = x + 'px';
-  menu.style.top  = y + 'px';
+  menu.style.left = Math.min(ev.clientX, window.innerWidth-220)+'px';
+  menu.style.top  = Math.min(ev.clientY, window.innerHeight-130)+'px';
 }
 
 function closeCtx() {
   document.getElementById('ctx-menu').classList.add('hidden');
-  ctxState = { mode: null, idx: -1, latlng: null };
+  ctxState = { mode:null, idx:-1, latlng:null };
 }
 
+// ── BUG FIX: save state BEFORE calling closeCtx ──
 function ctxAdd() {
-  closeCtx();
-  if (!ctxState.latlng) return;
-  const ll  = ctxState.latlng;
-  const idx = ctxState.idx;
-  spawnMarker({ lat: ll.lat, lon: ll.lng }, idx);
+  const latlng = ctxState.latlng;   // ← save first
+  const idx    = ctxState.idx;
+  closeCtx();                        // ← then close (resets ctxState)
+  if (!latlng) return;
+  spawnMarker({ lat:latlng.lat, lon:latlng.lng }, idx);
   refreshPolyline();
   refreshEndpoints();
   updateStats();
@@ -894,7 +754,7 @@ function ctxAdd() {
 }
 
 function ctxDelete() {
-  const idx = ctxState.idx;
+  const idx = ctxState.idx;         // ← save first
   closeCtx();
   if (markers.length <= 2) { alert('La ligne doit conserver au moins 2 poignées.'); return; }
   markers[idx].remove();
@@ -905,115 +765,92 @@ function ctxDelete() {
   if (showBuf) renderBuffer();
 }
 
-document.addEventListener('click', e => {
-  if (!e.target.closest('#ctx-menu')) closeCtx();
-});
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtx(); });
+document.addEventListener('click', e => { if (!e.target.closest('#ctx-menu')) closeCtx(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeCtx(); });
 
 // ═══════════════════════════════════════════════════
 //  STATS & UI
 // ═══════════════════════════════════════════════════
-
 function updateStats() {
-  const pts = markers.map(m => { const ll=m.getLatLng(); return {lat:ll.lat,lon:ll.lng}; });
+  const pts = markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
   const len = pathLen(pts);
-  document.getElementById('stat-len').textContent
-    = len > 1000 ? (len/1000).toFixed(2)+' km' : Math.round(len)+' m';
+  document.getElementById('stat-len').textContent = len>1000?(len/1000).toFixed(2)+' km':Math.round(len)+' m';
   document.getElementById('stat-handles').textContent = markers.length;
-  document.getElementById('stat-seg').textContent     = Math.max(0, markers.length-1);
-  markers.forEach((m,i) => updateTooltip(m,i));
+  document.getElementById('stat-seg').textContent = Math.max(0,markers.length-1);
+  markers.forEach((m,i)=>updateTooltip(m,i));
 }
 
-function toggleNumbers(on) {
-  showNums = on;
-  markers.forEach((m,i) => updateTooltip(m,i));
-}
-
-function setStatus(msg, type='loading') {
-  document.getElementById('status-text').textContent = msg;
-  const dot = document.getElementById('status-dot');
-  dot.className = type;
-}
-
-function fitStreet() {
-  if (markers.length) map.fitBounds(
-    L.latLngBounds(markers.map(m=>m.getLatLng())),
-    { padding:[40,60] }
-  );
-}
+function toggleNumbers(on) { showNums=on; markers.forEach((m,i)=>updateTooltip(m,i)); }
+function setStatus(msg,type='loading') { document.getElementById('status-text').textContent=msg; document.getElementById('status-dot').className=type; }
+function fitStreet() { if (markers.length) map.fitBounds(L.latLngBounds(markers.map(m=>m.getLatLng())),{padding:[40,60]}); }
 
 function resetLine() {
   if (!origPts) return;
-  clearAll();
-  buildLine(origPts);
-  updateStats();
-  setStatus('Ligne réinitialisée aux données OSM d\'origine', 'ready');
+  clearAll(); buildLine(origPts); updateStats();
+  setStatus('Ligne réinitialisée','ready');
   if (showBuf) renderBuffer();
 }
 
 // ═══════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════
-
 function exportGeoJSON() {
-  const coords = markers.map(m => {
-    const ll = m.getLatLng(); return [ll.lng, ll.lat];
-  });
-  const pts = markers.map(m => { const ll=m.getLatLng(); return {lat:ll.lat,lon:ll.lng}; });
-
+  const pts = markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
   const geojson = {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: {
-          name          : 'Rue de Rivoli',
-          city          : 'Paris',
-          type          : 'geofencing-centerline',
-          total_length_m: Math.round(pathLen(pts)),
-          anchor_count  : markers.length,
-          anchor_interval_m: 100,
-          source        : 'OpenStreetMap / Paris Geofencing Editor',
-          generated_at  : new Date().toISOString()
-        },
-        geometry: { type: 'LineString', coordinates: coords }
-      }
-    ]
+    type:'Feature',
+    properties:{
+      name:'Rue de Rivoli', city:'Paris', type:'geofencing-centerline',
+      total_length_m:Math.round(pathLen(pts)), anchor_count:markers.length,
+      buffer_width_m:bufferWidth, line_color:lineColor,
+      source:'OpenStreetMap / Paris Geofencing Editor',
+      generated_at:new Date().toISOString()
+    },
+    geometry:{ type:'LineString', coordinates:markers.map(m=>{const ll=m.getLatLng();return[ll.lng,ll.lat];}) }
   };
-
-  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type:'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), {
-    href: url, download: 'rue-de-rivoli-geofencing.geojson'
-  });
-  a.click();
+  const blob=new Blob([JSON.stringify(geojson,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'),{href:url,download:'rue-de-rivoli-geofencing.geojson'}).click();
   URL.revokeObjectURL(url);
-  setStatus('Fichier GeoJSON exporté ✓', 'ready');
+  setStatus('Fichier GeoJSON exporté ✓','ready');
 }
 
 // ═══════════════════════════════════════════════════
 //  FALLBACK COORDINATES
-//  (Rue de Rivoli, Place de la Concorde → Bastille)
-//  Based on OSM data, ~100 m spacing
+//  Rue de Rivoli — poignée à chaque carrefour principal
+//  (données OSM embarquées, Place de la Concorde → Bastille)
 // ═══════════════════════════════════════════════════
-
 function getFallback() {
   return [
-    {lat:48.8654,lon:2.3219},{lat:48.8649,lon:2.3235},
-    {lat:48.8645,lon:2.3252},{lat:48.8641,lon:2.3269},
-    {lat:48.8637,lon:2.3286},{lat:48.8634,lon:2.3303},
-    {lat:48.8631,lon:2.3320},{lat:48.8628,lon:2.3337},
-    {lat:48.8625,lon:2.3354},{lat:48.8622,lon:2.3371},
-    {lat:48.8619,lon:2.3388},{lat:48.8616,lon:2.3405},
-    {lat:48.8613,lon:2.3422},{lat:48.8610,lon:2.3439},
-    {lat:48.8607,lon:2.3456},{lat:48.8604,lon:2.3472},
-    {lat:48.8601,lon:2.3489},{lat:48.8597,lon:2.3505},
-    {lat:48.8592,lon:2.3519},{lat:48.8585,lon:2.3532},
-    {lat:48.8577,lon:2.3544},{lat:48.8570,lon:2.3556},
-    {lat:48.8563,lon:2.3568},{lat:48.8558,lon:2.3580},
-    {lat:48.8554,lon:2.3593},{lat:48.8551,lon:2.3606},
-    {lat:48.8549,lon:2.3620},{lat:48.8548,lon:2.3634},
-    {lat:48.8547,lon:2.3648},{lat:48.8546,lon:2.3662}
+    // ── Section ouest : Place de la Concorde → Tuileries ──
+    {lat:48.8651,lon:2.3218}, // Place de la Concorde (départ)
+    {lat:48.8649,lon:2.3234}, // Rue Royale
+    {lat:48.8647,lon:2.3251}, // Rue Saint-Florentin
+    {lat:48.8644,lon:2.3271}, // Rue de Rivoli / Rue de Rivoli (angle)
+    {lat:48.8641,lon:2.3292}, // Rue de Castiglione
+    {lat:48.8638,lon:2.3310}, // Rue Cambon
+    {lat:48.8635,lon:2.3327}, // Rue du Mont-Thabor
+    {lat:48.8632,lon:2.3344}, // Rue du 29-Juillet
+    // ── Section centrale : Palais-Royal → Louvre ──
+    {lat:48.8628,lon:2.3362}, // Rue de l'Échelle (Palais-Royal ouest)
+    {lat:48.8624,lon:2.3376}, // Rue de Rivoli / Rue Saint-Honoré
+    {lat:48.8620,lon:2.3392}, // Rue des Pyramides
+    {lat:48.8616,lon:2.3407}, // Rue Saint-Nicaise (Carrousel)
+    {lat:48.8611,lon:2.3424}, // Rue de Rohan
+    {lat:48.8606,lon:2.3441}, // Rue du Louvre (cour du Louvre)
+    // ── Transition : Louvre → Châtelet ──
+    {lat:48.8600,lon:2.3455}, // Rue du Pont-Neuf (nord)
+    {lat:48.8593,lon:2.3466}, // Rue Berger
+    {lat:48.8585,lon:2.3472}, // Place du Châtelet (ouest)
+    {lat:48.8578,lon:2.3476}, // Place du Châtelet (est)
+    // ── Section est : Hôtel de Ville → Marais ──
+    {lat:48.8571,lon:2.3490}, // Rue Saint-Martin
+    {lat:48.8566,lon:2.3507}, // Rue de la Verrerie
+    {lat:48.8562,lon:2.3525}, // Rue du Temple (Hôtel de Ville)
+    {lat:48.8558,lon:2.3549}, // Rue François Miron
+    {lat:48.8554,lon:2.3573}, // Rue de Birague
+    {lat:48.8550,lon:2.3598}, // Rue de Sévigné
+    {lat:48.8547,lon:2.3618}, // Rue du Prévôt
+    {lat:48.8545,lon:2.3630}  // Fin — Rue Saint-Antoine
   ];
 }
 
