@@ -212,6 +212,9 @@
     .ctx-item.danger:hover { background: rgba(231,76,60,.12); }
     .ctx-sep { height: 1px; background: #232645; margin: 4px 0; }
     .ctx-label { padding: 5px 13px 3px; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #6470a8; }
+    .ctx-info-name { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; }
+    .ctx-info-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#8892b0; margin-bottom:3px; gap:12px; }
+    .ctx-info-row b { color:#c5cef0; font-weight:700; white-space:nowrap; }
   </style>
 </head>
 <body>
@@ -318,12 +321,17 @@
 
 <!-- Context Menu -->
 <div id="ctx-menu" class="hidden">
-  <div class="ctx-label" id="ctx-title">Action</div>
+  <!-- Info block (visible on line right-click) -->
+  <div id="ctx-info" style="display:none;padding:8px 13px 6px;"></div>
+  <div class="ctx-sep" id="ctx-info-sep" style="display:none"></div>
+  <!-- Handle title (visible on marker right-click) -->
+  <div class="ctx-label" id="ctx-title">Poignée</div>
+  <!-- Actions -->
   <div class="ctx-item" id="ctx-add"  onclick="ctxAdd()"><span>➕</span> Ajouter une poignée ici</div>
   <div class="ctx-sep" id="ctx-sep-1"></div>
   <div class="ctx-item danger" id="ctx-del" onclick="ctxDelete()"><span>🗑</span> Supprimer cette poignée</div>
   <div class="ctx-sep"></div>
-  <div class="ctx-item" onclick="closeCtx()"><span style="color:#6470a8">✕</span> Annuler</div>
+  <div class="ctx-item" onclick="closeCtx()"><span style="color:#6470a8">✕</span> Fermer</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -483,12 +491,21 @@ function resample(path, interval=100, boundaryKeys=new Set()) {
 async function loadStreet() {
   setStatus('Connexion à OpenStreetMap…','loading');
 
-  // Query: primary + secondary only, within Paris bbox
+  // Query: ALL highway types for Rue de Rivoli — on filtrera par latitude ensuite
   const query = `[out:json][timeout:60];
 (
-  way["name"="Rue de Rivoli"]["highway"~"^(primary|secondary)$"](48.850,2.310,48.872,2.375);
+  way["name"="Rue de Rivoli"]["highway"](48.850,2.310,48.872,2.375);
 );
 out geom;`;
+
+  // Droite de référence du tracé validé par l'utilisateur :
+  // début (2.3236, 48.8664) → fin (2.3620, 48.8550)
+  const REF_START = {lat:48.8664, lon:2.3236};
+  const REF_END   = {lat:48.8550, lon:2.3620};
+  function expectedLat(lon) {
+    const t = (lon - REF_START.lon) / (REF_END.lon - REF_START.lon);
+    return REF_START.lat + t * (REF_END.lat - REF_START.lat);
+  }
 
   try {
     const res = await fetch('https://overpass-api.de/api/interpreter', {
@@ -499,8 +516,14 @@ out geom;`;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
-    const ways = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
-    if (!ways.length) throw new Error('Aucun segment primary/secondary reçu');
+    // Filtrer par latitude : garder uniquement les ways dont le point médian
+    // est à moins de 0.0014° (~155 m) de la droite de référence validée
+    const allWays = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
+    const ways = allWays.filter(w => {
+      const mid = w.geometry[Math.floor(w.geometry.length/2)];
+      return Math.abs(mid.lat - expectedLat(mid.lon)) < 0.0014;
+    });
+    if (!ways.length) throw new Error('Aucun segment OSM dans la plage de latitude attendue');
 
     setStatus(`${ways.length} segments OSM — fusion…`,'loading');
 
@@ -707,6 +730,28 @@ function importJSON(ev) {
 // ═══════════════════════════════════════════════════
 //  CONTEXT MENU
 // ═══════════════════════════════════════════════════
+/** Distance cumulée (mètres) depuis le début de la ligne jusqu'au point cliqué */
+function distanceAlongLine(latlng) {
+  const lls = markers.map(m=>m.getLatLng());
+  let bestIdx=0, minD=Infinity;
+  for (let i=0; i<lls.length-1; i++) {
+    const d=ptSegDist(latlng.lng,latlng.lat,lls[i].lng,lls[i].lat,lls[i+1].lng,lls[i+1].lat);
+    if (d<minD) { minD=d; bestIdx=i; }
+  }
+  // Distance cumulée jusqu'au début de ce segment
+  let total=0;
+  for (let i=0; i<bestIdx; i++)
+    total+=haversine(lls[i].lat,lls[i].lng,lls[i+1].lat,lls[i+1].lng);
+  // Projection dans le segment courant
+  const a=lls[bestIdx], b=lls[bestIdx+1];
+  const dx=b.lng-a.lng, dy=b.lat-a.lat, len2=dx*dx+dy*dy;
+  if (len2>0) {
+    const t=Math.max(0,Math.min(1,((latlng.lng-a.lng)*dx+(latlng.lat-a.lat)*dy)/len2));
+    total+=t*haversine(a.lat,a.lng,b.lat,b.lng);
+  }
+  return total;
+}
+
 function onLineRightClick(e) {
   L.DomEvent.stopPropagation(e);
   L.DomEvent.preventDefault(e);
@@ -725,14 +770,37 @@ function nearestSegIdx(latlng) {
 
 function openCtx(ev, mode, idx, latlng) {
   ctxState = { mode, idx, latlng };
-  const menu=document.getElementById('ctx-menu');
-  document.getElementById('ctx-title').textContent = mode==='line' ? 'Ajouter un point' : `Poignée #${idx+1}`;
-  document.getElementById('ctx-add').style.display  = mode==='line'   ? 'flex' : 'none';
-  document.getElementById('ctx-sep-1').style.display= mode==='line'   ? 'block': 'none';
-  document.getElementById('ctx-del').style.display  = mode==='marker' ? 'flex' : 'none';
+  const menu = document.getElementById('ctx-menu');
+
+  // ── Info section (line right-click) ──────────────────
+  const infoEl = document.getElementById('ctx-info');
+  if (mode === 'line' && latlng) {
+    const dist   = distanceAlongLine(latlng);
+    const distFmt = dist > 1000 ? (dist/1000).toFixed(2)+' km' : Math.round(dist)+' m';
+    const total  = pathLen(markers.map(m=>{const l=m.getLatLng();return{lat:l.lat,lon:l.lng};}));
+    const totalFmt = total>1000?(total/1000).toFixed(2)+' km':Math.round(total)+' m';
+    infoEl.innerHTML = `
+      <div class="ctx-info-name">📍 Rue de Rivoli</div>
+      <div class="ctx-info-row"><span>Depuis le début</span><b>${distFmt}</b></div>
+      <div class="ctx-info-row"><span>Longueur totale</span><b>${totalFmt}</b></div>
+      <div class="ctx-info-row"><span>Coordonnées</span><b>${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}</b></div>`;
+    infoEl.style.display = 'block';
+    document.getElementById('ctx-info-sep').style.display = 'block';
+  } else {
+    infoEl.style.display = 'none';
+    document.getElementById('ctx-info-sep').style.display = 'none';
+  }
+
+  // ── Title + actions ───────────────────────────────────
+  document.getElementById('ctx-title').textContent    = mode==='marker' ? `Poignée #${idx+1}` : '';
+  document.getElementById('ctx-title').style.display  = mode==='marker' ? 'block' : 'none';
+  document.getElementById('ctx-add').style.display    = mode==='line'   ? 'flex'  : 'none';
+  document.getElementById('ctx-sep-1').style.display  = mode==='line'   ? 'block' : 'none';
+  document.getElementById('ctx-del').style.display    = mode==='marker' ? 'flex'  : 'none';
+
   menu.classList.remove('hidden');
-  menu.style.left = Math.min(ev.clientX, window.innerWidth-220)+'px';
-  menu.style.top  = Math.min(ev.clientY, window.innerHeight-130)+'px';
+  menu.style.left = Math.min(ev.clientX, window.innerWidth-240)+'px';
+  menu.style.top  = Math.min(ev.clientY, window.innerHeight-180)+'px';
 }
 
 function closeCtx() {
@@ -796,62 +864,78 @@ function resetLine() {
 // ═══════════════════════════════════════════════════
 function exportGeoJSON() {
   const pts = markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};});
+  const FILENAME = 'rue-de-rivoli-geofencing.geojson';
   const geojson = {
-    type:'Feature',
-    properties:{
-      name:'Rue de Rivoli', city:'Paris', type:'geofencing-centerline',
-      total_length_m:Math.round(pathLen(pts)), anchor_count:markers.length,
-      buffer_width_m:bufferWidth, line_color:lineColor,
-      source:'OpenStreetMap / Paris Geofencing Editor',
-      generated_at:new Date().toISOString()
-    },
-    geometry:{ type:'LineString', coordinates:markers.map(m=>{const ll=m.getLatLng();return[ll.lng,ll.lat];}) }
+    type:'FeatureCollection',
+    features:[{
+      type:'Feature',
+      properties:{
+        name:'Rue de Rivoli', city:'Paris', type:'geofencing-centerline',
+        total_length_m:Math.round(pathLen(pts)), anchor_count:markers.length,
+        buffer_width_m:bufferWidth, line_color:lineColor,
+        source:'OpenStreetMap / Paris Geofencing Editor',
+        generated_at:new Date().toISOString()
+      },
+      geometry:{ type:'LineString', coordinates:markers.map(m=>{const ll=m.getLatLng();return[ll.lng,ll.lat];}) }
+    }]
   };
-  const blob=new Blob([JSON.stringify(geojson,null,2)],{type:'application/json'});
+  const body = JSON.stringify(geojson,null,2);
+
+  // ① Téléchargement navigateur
+  const blob=new Blob([body],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  Object.assign(document.createElement('a'),{href:url,download:'rue-de-rivoli-geofencing.geojson'}).click();
+  Object.assign(document.createElement('a'),{href:url,download:FILENAME}).click();
   URL.revokeObjectURL(url);
-  setStatus('Fichier GeoJSON exporté ✓','ready');
+
+  // ② Sauvegarde automatique côté serveur (dossier GEOFENCING)
+  fetch('/save', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Filename':FILENAME},
+    body
+  }).then(r=>r.json()).then(d=>{
+    setStatus(d.ok ? `✓ Exporté et sauvegardé : ${FILENAME}` : `Exporté (save local échoué)`, 'ready');
+  }).catch(()=>{
+    setStatus(`✓ GeoJSON exporté (pas de serveur local actif)`, 'ready');
+  });
 }
 
 // ═══════════════════════════════════════════════════
 //  FALLBACK COORDINATES
-//  Rue de Rivoli — poignée à chaque carrefour principal
-//  (données OSM embarquées, Place de la Concorde → Bastille)
+//  Coordonnées VALIDÉES par l'utilisateur le 23/03/2026
+//  (extrait de rue-de-rivoli-geofencing.geojson exporté)
+//  Format GeoJSON [lon, lat] → converti en {lat, lon}
 // ═══════════════════════════════════════════════════
 function getFallback() {
-  return [
-    // ── Section ouest : Place de la Concorde → Tuileries ──
-    {lat:48.8651,lon:2.3218}, // Place de la Concorde (départ)
-    {lat:48.8649,lon:2.3234}, // Rue Royale
-    {lat:48.8647,lon:2.3251}, // Rue Saint-Florentin
-    {lat:48.8644,lon:2.3271}, // Rue de Rivoli / Rue de Rivoli (angle)
-    {lat:48.8641,lon:2.3292}, // Rue de Castiglione
-    {lat:48.8638,lon:2.3310}, // Rue Cambon
-    {lat:48.8635,lon:2.3327}, // Rue du Mont-Thabor
-    {lat:48.8632,lon:2.3344}, // Rue du 29-Juillet
-    // ── Section centrale : Palais-Royal → Louvre ──
-    {lat:48.8628,lon:2.3362}, // Rue de l'Échelle (Palais-Royal ouest)
-    {lat:48.8624,lon:2.3376}, // Rue de Rivoli / Rue Saint-Honoré
-    {lat:48.8620,lon:2.3392}, // Rue des Pyramides
-    {lat:48.8616,lon:2.3407}, // Rue Saint-Nicaise (Carrousel)
-    {lat:48.8611,lon:2.3424}, // Rue de Rohan
-    {lat:48.8606,lon:2.3441}, // Rue du Louvre (cour du Louvre)
-    // ── Transition : Louvre → Châtelet ──
-    {lat:48.8600,lon:2.3455}, // Rue du Pont-Neuf (nord)
-    {lat:48.8593,lon:2.3466}, // Rue Berger
-    {lat:48.8585,lon:2.3472}, // Place du Châtelet (ouest)
-    {lat:48.8578,lon:2.3476}, // Place du Châtelet (est)
-    // ── Section est : Hôtel de Ville → Marais ──
-    {lat:48.8571,lon:2.3490}, // Rue Saint-Martin
-    {lat:48.8566,lon:2.3507}, // Rue de la Verrerie
-    {lat:48.8562,lon:2.3525}, // Rue du Temple (Hôtel de Ville)
-    {lat:48.8558,lon:2.3549}, // Rue François Miron
-    {lat:48.8554,lon:2.3573}, // Rue de Birague
-    {lat:48.8550,lon:2.3598}, // Rue de Sévigné
-    {lat:48.8547,lon:2.3618}, // Rue du Prévôt
-    {lat:48.8545,lon:2.3630}  // Fin — Rue Saint-Antoine
+  const raw = [
+    [2.323597669601441,  48.86637332881225],  // Début — Place de la Concorde
+    [2.324096560478211,  48.86629216617396],
+    [2.325915098190308,  48.86571343745897],
+    [2.327036261558533,  48.865353493053135],
+    [2.328312993049622,  48.86493708354968],  // Rue de Castiglione
+    [2.330083250999451,  48.86435128126382],
+    [2.3318213224411015, 48.8638007620223],
+    [2.333637177944184,  48.86322200449507],  // Rue des Pyramides
+    [2.3353162407875065, 48.86269088270434],
+    [2.337081134319306,  48.86214387430383],
+    [2.338545620441437,  48.86166744276122],  // Rue du Louvre
+    [2.339822351932526,  48.86125276717152],
+    [2.3407343029975896, 48.86096337451177],
+    [2.341750860214234,  48.86060868976249],
+    [2.3431563377380376, 48.860158712956114],
+    [2.3448085784912114, 48.85962050009043],
+    [2.3466056585311894, 48.85905757618],     // Place du Châtelet
+    [2.3483303189277653, 48.85847346975592],
+    [2.350113987922669,  48.85792288585892],
+    [2.3515462875366215, 48.8574728849071],   // Hôtel de Ville
+    [2.3538476228713994, 48.85693287842495],
+    [2.3551404476165776, 48.85663993129474],
+    [2.3566639423370366, 48.856269333071424], // Saint-Paul
+    [2.358192801475525,  48.85589520255827],
+    [2.3595553636550903, 48.855612838055364],
+    [2.3608911037445073, 48.855266939368754],
+    [2.3619854450225835, 48.854959864042286]  // Fin — Rue Saint-Antoine
   ];
+  return raw.map(([lon, lat]) => ({lat, lon}));
 }
 
 // ═══════════════════════════════════════════════════
