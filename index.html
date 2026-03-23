@@ -409,6 +409,9 @@ let showNums    = false;
 let bufferWidth = 30;
 let ctxState    = { mode: null, idx: -1, latlng: null };
 
+// Server base URL — fonctionne en file:// ET en http://
+const SERVER_BASE = (location.protocol === 'file:') ? 'http://localhost:7821' : '';
+
 // Multi-street storage
 const STREET_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#16a085'];
 let streets       = [];  // [{id, name, markers, polyline, hitPolyline, bufferLayer, origPts, color}]
@@ -1419,7 +1422,7 @@ function autoSave() {
   autoSaveTimer = setTimeout(() => {
     const geojson = buildGeoJSON();
     const body = JSON.stringify(geojson, null, 2);
-    fetch('/save', {
+    fetch(SERVER_BASE + '/save', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body
@@ -1453,7 +1456,7 @@ function exportGeoJSON() {
   URL.revokeObjectURL(url);
 
   // ② Sauvegarde versionnée côté serveur
-  fetch('/save', {
+  fetch(SERVER_BASE + '/save', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body
@@ -1470,36 +1473,11 @@ function exportGeoJSON() {
 // ═══════════════════════════════════════════════════
 async function loadLatestSave() {
   try {
-    const res = await fetch('/load-latest');
+    const res = await fetch(SERVER_BASE + '/load-latest');
     if (!res.ok) return false;
     const json = await res.json();
     if (!json.ok || !json.data?.features?.length) return false;
-
-    const features = json.data.features.filter(f => f.geometry?.type === 'LineString');
-    if (!features.length) return false;
-
-    // Charger chaque feature comme une rue
-    for (const feat of features) {
-      const pts = feat.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
-      if (pts.length < 2) continue;
-
-      const name = feat.properties?.name || 'Rue importée';
-      // Ne pas dupliquer
-      if (streets.find(s => s.name === name)) continue;
-
-      const color = feat.properties?.line_color || STREET_COLORS[streets.length % STREET_COLORS.length];
-      const id = ++streetIdCounter;
-      const s = {
-        id, name, markers: [], polyline: null, hitPolyline: null,
-        bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false
-      };
-      streets.push(s);
-      activeStreetId = id;
-      buildLineForStreet(s, pts);
-    }
-
-    renderStreetList();
-    updateStats();
+    loadGeoJSONFeatures(json.data);
     return true;
   } catch(e) {
     return false;  // serveur non dispo, on continue avec le fallback
@@ -1507,74 +1485,118 @@ async function loadLatestSave() {
 }
 
 // ═══════════════════════════════════════════════════
-//  FALLBACK COORDINATES — Rue de Rivoli
-//  Coordonnées VALIDÉES par l'utilisateur le 23/03/2026
-//  Format GeoJSON [lon, lat] → converti en {lat, lon}
+//  DONNÉES EMBARQUÉES — dernière sauvegarde intégrée au HTML
+//  Chargées automatiquement si le serveur n'est pas disponible
+//  Mis à jour le 23/03/2026
 // ═══════════════════════════════════════════════════
-function getFallback() {
-  const raw = [
-    [2.323597669601441,  48.86637332881225],  // Début — Place de la Concorde
-    [2.324096560478211,  48.86629216617396],
-    [2.325915098190308,  48.86571343745897],
-    [2.327036261558533,  48.865353493053135],
-    [2.328312993049622,  48.86493708354968],  // Rue de Castiglione
-    [2.330083250999451,  48.86435128126382],
-    [2.3318213224411015, 48.8638007620223],
-    [2.333637177944184,  48.86322200449507],  // Rue des Pyramides
-    [2.3353162407875065, 48.86269088270434],
-    [2.337081134319306,  48.86214387430383],
-    [2.338545620441437,  48.86166744276122],  // Rue du Louvre
-    [2.339822351932526,  48.86125276717152],
-    [2.3407343029975896, 48.86096337451177],
-    [2.341750860214234,  48.86060868976249],
-    [2.3431563377380376, 48.860158712956114],
-    [2.3448085784912114, 48.85962050009043],
-    [2.3466056585311894, 48.85905757618],     // Place du Châtelet
-    [2.3483303189277653, 48.85847346975592],
-    [2.350113987922669,  48.85792288585892],
-    [2.3515462875366215, 48.8574728849071],   // Hôtel de Ville
-    [2.3538476228713994, 48.85693287842495],
-    [2.3551404476165776, 48.85663993129474],
-    [2.3566639423370366, 48.856269333071424], // Saint-Paul
-    [2.358192801475525,  48.85589520255827],
-    [2.3595553636550903, 48.855612838055364],
-    [2.3608911037445073, 48.855266939368754],
-    [2.3619854450225835, 48.854959864042286]  // Fin — Rue Saint-Antoine
-  ];
-  return raw.map(([lon, lat]) => ({lat, lon}));
+function getEmbeddedGeoJSON() {
+  return {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "name": "Rue de Rivoli", "color": "#e74c3c" },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [2.323597669601441,48.86637332881225],[2.324096560478211,48.86629216617396],
+            [2.325915098190308,48.86571343745897],[2.327036261558533,48.865353493053135],
+            [2.328312993049622,48.86493708354968],[2.330083250999451,48.86435128126382],
+            [2.3318213224411015,48.8638007620223],[2.333637177944184,48.86322200449507],
+            [2.3353162407875065,48.86269088270434],[2.337081134319306,48.86214387430383],
+            [2.338545620441437,48.86166744276122],[2.339822351932526,48.86125276717152],
+            [2.3407343029975896,48.86096337451177],[2.341750860214234,48.86060868976249],
+            [2.3431563377380376,48.860158712956114],[2.3448085784912114,48.85962050009043],
+            [2.3466056585311894,48.85905757618],[2.3483303189277653,48.85847346975592],
+            [2.350113987922669,48.85792288585892],[2.3515462875366215,48.8574728849071],
+            [2.3538476228713994,48.85693287842495],[2.3551404476165776,48.85663993129474],
+            [2.3566639423370366,48.856269333071424],[2.358192801475525,48.85589520255827],
+            [2.3595553636550903,48.855612838055364],[2.3608911037445073,48.855266939368754],
+            [2.3619854450225835,48.854959864042286]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "Boulevard Saint-Germain", "color": "#2ecc71" },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [2.3189848,48.8625251],[2.3199242,48.8619004],[2.3206650,48.8611447],
+            [2.3213675,48.8603732],[2.3220889,48.8596094],[2.3228186,48.8588490],
+            [2.3235332,48.8580824],[2.3242593,48.8573204],[2.3250969,48.8566109],
+            [2.3260802,48.8559916],[2.3272089,48.8554849],[2.3284243,48.8550735],
+            [2.3296716,48.8547063],[2.3309374,48.8543677],[2.3322253,48.8540666],
+            [2.3335076,48.8537553],[2.3347896,48.8534434],[2.3360689,48.8531270],
+            [2.3373513,48.8528160],[2.3386332,48.8525041],[2.3399180,48.8521973],
+            [2.3411994,48.8518845],[2.3424792,48.8515688],[2.3437622,48.8512591],
+            [2.3450473,48.8509530],[2.3463334,48.8506487],[2.3476125,48.8503320],
+            [2.3488907,48.8500136],[2.3501698,48.8496968],[2.3515163,48.8495753],
+            [2.3528804,48.8495200],[2.3542440,48.8494604],[2.3556052,48.8493819],
+            [2.3569149,48.8492915],[2.3572253,48.8492523]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "Rue de Rennes", "color": "#3498db" },
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [2.3241805,48.844189],[2.3249156,48.8449471],[2.3256507,48.8457053],
+            [2.3263857,48.8464634],[2.3271208,48.8472215],[2.3278360,48.8479877],
+            [2.3285231,48.8487651],[2.3292102,48.8495425],[2.3298972,48.8503199],
+            [2.3305843,48.8510973],[2.3312714,48.8518747],[2.3319585,48.8526522],
+            [2.3326455,48.8534296],[2.3328713,48.853685]
+          ]
+        }
+      }
+    ]
+  };
+}
+
+/**
+ * Charge les rues depuis un objet GeoJSON (serveur ou embarqué).
+ */
+function loadGeoJSONFeatures(geojson) {
+  const features = geojson.features.filter(f => f.geometry?.type === 'LineString');
+  for (const feat of features) {
+    const pts = feat.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
+    if (pts.length < 2) continue;
+    const name = feat.properties?.name || 'Rue importée';
+    if (streets.find(s => s.name === name)) continue;
+    const color = feat.properties?.color || feat.properties?.line_color || STREET_COLORS[streets.length % STREET_COLORS.length];
+    const id = ++streetIdCounter;
+    const s = {
+      id, name, markers: [], polyline: null, hitPolyline: null,
+      bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false
+    };
+    streets.push(s);
+    activeStreetId = id;
+    buildLineForStreet(s, pts);
+  }
+  renderStreetList();
+  updateStats();
 }
 
 // ═══════════════════════════════════════════════════
-//  BOOT — chargement initial avec Rue de Rivoli
+//  BOOT — chargement initial
 // ═══════════════════════════════════════════════════
 (async function boot() {
   document.getElementById('loading').classList.add('hidden');
   setStatus('Chargement…', 'loading');
 
-  // Essayer de charger la dernière sauvegarde
+  // 1) Essayer de charger depuis le serveur (si dispo)
   const loaded = await loadLatestSave();
 
   if (loaded && streets.length) {
     fitStreet();
-    updateStats();
     setStatus(`${streets.length} rue(s) restaurée(s) depuis la dernière sauvegarde`, 'ready');
   } else {
-    // Fallback : charger Rue de Rivoli depuis les données embarquées
-    const fb = getFallback();
-    const id = ++streetIdCounter;
-    const s = {
-      id, name: 'Rue de Rivoli', markers: [], polyline: null,
-      hitPolyline: null, bufferLayer: null,
-      origPts: fb.map(p=>({...p})),
-      color: STREET_COLORS[0], loading: false
-    };
-    streets.push(s);
-    activeStreetId = id;
-    buildLineForStreet(s, fb);
-    renderStreetList();
+    // 2) Fallback : données embarquées dans le HTML
+    loadGeoJSONFeatures(getEmbeddedGeoJSON());
     fitStreet();
-    updateStats();
-    setStatus('1 rue chargée — ajoutez-en d\'autres !', 'ready');
+    setStatus(`${streets.length} rue(s) chargée(s) — ajoutez-en d'autres !`, 'ready');
   }
 })();
 </script>
