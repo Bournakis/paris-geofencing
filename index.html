@@ -158,6 +158,8 @@
     .btn-save  { background: #1a3050; color: #5dade2; border: 1px solid #2a5070; font-weight: 700; }
     .btn-save:hover { background: #1e3d63; }
     .btn-save:disabled { opacity: .5; cursor: default; }
+    .btn-reset { background: #2a1010; color: #e74c3c; border: 1px solid #7b2020; font-weight: 700; margin-top: 10px; }
+    .btn-reset:hover { background: #3d1515; border-color: #e74c3c; }
     .btn-green:hover { background: #27ae60; color: #fff; }
 
     /* Instruction card */
@@ -386,6 +388,7 @@
     <button class="btn btn-dark" onclick="resetLine()">↺&nbsp; Réinitialiser la ligne</button>
     <button class="btn btn-ghost" onclick="fitStreet()">⛶&nbsp; Recentrer la vue</button>
     <button class="btn btn-save" id="btn-manual-save" onclick="manualSave()">💾&nbsp; Sauvegarder</button>
+    <button class="btn btn-reset" onclick="resetAll()">🗑&nbsp; Tout réinitialiser</button>
 
     <div class="section-title" style="margin-top:6px">Mode d'emploi</div>
     <div class="instructions-card">
@@ -1731,6 +1734,40 @@ function manualSave() {
   }).finally(() => {
     if (btn) { btn.disabled = false; btn.innerHTML = '💾&nbsp; Sauvegarder'; }
   });
+}
+
+// ═══════════════════════════════════════════════════
+//  RESET — efface tout et repart de zéro
+// ═══════════════════════════════════════════════════
+function resetAll() {
+  if (!streets.length) {
+    setStatus('Aucune rue à effacer', 'loading');
+    return;
+  }
+  const n = streets.length;
+  if (!confirm(`Effacer les ${n} rue(s) chargée(s) ? Cette action est irréversible.`)) return;
+
+  // Supprimer tous les layers Leaflet de chaque rue
+  streets.forEach(s => {
+    s.markers.forEach(m => m.remove());
+    if (s.polyline)    s.polyline.remove();
+    if (s.hitPolyline) s.hitPolyline.remove();
+    if (s.bufferLayer) s.bufferLayer.remove();
+  });
+
+  // Réinitialiser l'état global
+  streets          = [];
+  activeStreetId   = null;
+  streetIdCounter  = 0;
+
+  renderStreetList();
+  updateStats();
+  setStatus('Carte réinitialisée — importez un fichier GeoJSON', 'loading');
+
+  // Proposer l'import directement
+  setTimeout(() => {
+    document.getElementById('json-file-input').click();
+  }, 300);
 }
 
 // ═══════════════════════════════════════════════════
