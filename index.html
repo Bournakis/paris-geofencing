@@ -155,6 +155,9 @@
     .btn-ghost { background: transparent; color: #6470a8; border: 1px solid #232645; }
     .btn-ghost:hover { color: #e2e8f0; background: #1c2040; }
     .btn-green { background: #1e4d3a; color: #2ecc71; border: 1px solid #2a6b50; }
+    .btn-save  { background: #1a3050; color: #5dade2; border: 1px solid #2a5070; font-weight: 700; }
+    .btn-save:hover { background: #1e3d63; }
+    .btn-save:disabled { opacity: .5; cursor: default; }
     .btn-green:hover { background: #27ae60; color: #fff; }
 
     /* Instruction card */
@@ -382,6 +385,7 @@
     <button class="btn btn-red"  onclick="exportGeoJSON()">⬇&nbsp; Exporter GeoJSON</button>
     <button class="btn btn-dark" onclick="resetLine()">↺&nbsp; Réinitialiser la ligne</button>
     <button class="btn btn-ghost" onclick="fitStreet()">⛶&nbsp; Recentrer la vue</button>
+    <button class="btn btn-save" id="btn-manual-save" onclick="manualSave()">💾&nbsp; Sauvegarder</button>
 
     <div class="section-title" style="margin-top:6px">Mode d'emploi</div>
     <div class="instructions-card">
@@ -1108,8 +1112,26 @@ async function addStreet() {
 
 function selectStreet(id) {
   activeStreetId = id;
+
+  // ── Mise à jour visuelle des tracés sur la carte ──
+  streets.forEach(s => {
+    if (!s.polyline) return;
+    if (s.id === id) {
+      // Rue sélectionnée : tracé mis en surbrillance
+      s.polyline.setStyle({ weight: 6, opacity: 1.0 });
+      s.polyline.bringToFront();
+    } else {
+      // Autres rues : légèrement atténuées
+      s.polyline.setStyle({ weight: 3, opacity: 0.6 });
+    }
+  });
+
   renderStreetList();
   updateStats();
+
+  // Sync dropdown
+  const sel = document.getElementById('street-selector');
+  if (sel) sel.value = id;
 
   // Update color picker to match active street
   const s = getActive();
@@ -1264,12 +1286,25 @@ function buildLineForStreet(s, pts) {
   if (s.hitPolyline) s.hitPolyline.remove();
   if (s.bufferLayer) { s.bufferLayer.remove(); s.bufferLayer = null; }
 
-  // Invisible wider polyline for easier right-click detection
-  s.hitPolyline = L.polyline(lls, { color:'transparent', weight:18, opacity:0, interactive:true }).addTo(map);
+  // Invisible wider polyline for easier right-click + left-click detection
+  s.hitPolyline = L.polyline(lls, { color:'transparent', weight:20, opacity:0, interactive:true }).addTo(map);
   s.hitPolyline.on('contextmenu', onLineRightClick);
+  s.hitPolyline.on('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    selectStreet(s.id);
+    // Scroll le menu sur la rue sélectionnée
+    setTimeout(() => {
+      const el = document.querySelector(`#street-list [data-sid="${s.id}"]`);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 50);
+  });
 
-  // Visible line
-  s.polyline = L.polyline(lls, { color, weight:4, opacity:0.9, smoothFactor:0.5, interactive:false }).addTo(map);
+  // Visible line — style selon rue active ou non
+  const isActive = s.id === activeStreetId;
+  s.polyline = L.polyline(lls, {
+    color, weight: isActive ? 6 : 3, opacity: isActive ? 1.0 : 0.6,
+    smoothFactor: 0.5, interactive: false
+  }).addTo(map);
 
   // Make this the active street so spawnMarker works
   activeStreetId = s.id;
@@ -1386,7 +1421,8 @@ function setLineColor(color, btn) {
   const s = getActive();
   if (s) {
     s.color = color;
-    if (s.polyline) s.polyline.setStyle({color});
+    // Conserver le weight de surbrillance actif
+    if (s.polyline) s.polyline.setStyle({ color, weight: 6, opacity: 1.0 });
     // Rafraîchir toutes les icônes de cette rue avec la nouvelle couleur
     s.markers.forEach((m, i) => m.setIcon(makeIcon(i===0 || i===s.markers.length-1, color)));
   }
@@ -1672,6 +1708,32 @@ function autoSave() {
 }
 
 // ═══════════════════════════════════════════════════
+//  MANUEL SAVE — sauvegarde versionnée dans /versions
+// ═══════════════════════════════════════════════════
+function manualSave() {
+  if (!streets.length) { setStatus('Aucune donnée à sauvegarder', 'loading'); return; }
+  const btn = document.getElementById('btn-manual-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳&nbsp; Sauvegarde…'; }
+
+  const geojson = buildGeoJSON();
+  fetch(SERVER_BASE + '/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(geojson, null, 2)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      setStatus(`💾 Sauvegardé : ${d.version} (${d.streets} rue(s))`, 'ready');
+    } else {
+      setStatus('Erreur lors de la sauvegarde', 'loading');
+    }
+  }).catch(() => {
+    setStatus('Serveur local non disponible — lancez server.py', 'loading');
+  }).finally(() => {
+    if (btn) { btn.disabled = false; btn.innerHTML = '💾&nbsp; Sauvegarder'; }
+  });
+}
+
+// ═══════════════════════════════════════════════════
 //  EXPORT — téléchargement + sauvegarde versionnée
 // ═══════════════════════════════════════════════════
 function exportGeoJSON() {
@@ -1680,10 +1742,11 @@ function exportGeoJSON() {
   const geojson = buildGeoJSON();
   const body = JSON.stringify(geojson, null, 2);
 
-  // Nom du fichier avec horodatage
+  // Nom du fichier — même nomenclature que le serveur : geofencing_YYYY-MM-DD_HH-MM-SS.geojson
   const now = new Date();
-  const ts = now.toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const FILENAME = `paris-geofencing_${ts}.geojson`;
+  const pad = n => String(n).padStart(2,'0');
+  const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const FILENAME = `geofencing_${ts}.geojson`;
 
   // ① Téléchargement navigateur
   const blob=new Blob([body],{type:'application/json'});
