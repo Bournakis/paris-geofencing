@@ -41,6 +41,35 @@
     .logo-dot { width: 8px; height: 8px; background: var(--line-color); border-radius: 50%; }
     .logo-text { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #6470a8; }
     .app-title { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+    .header-row { display: flex; align-items: center; gap: 8px; }
+    .btn-undo {
+      background: none; border: none; cursor: pointer; color: #6470a8;
+      font-size: 16px; padding: 3px 7px; border-radius: 6px; transition: all .15s; line-height: 1;
+    }
+    .btn-undo:hover:not(:disabled) { color: #e2e8f0; background: #232645; }
+    .btn-undo:disabled { opacity: .22; cursor: default; }
+
+    /* ── STREET NAME BAR ── */
+    #street-name-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 14px 6px; min-height: 36px;
+    }
+    #street-name-display {
+      flex: 1; font-size: 14px; font-weight: 700; color: #e2e8f0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+    }
+    #street-name-display.empty { color: #4a5280; font-style: italic; font-size: 12px; font-weight: 400; }
+    #street-name-edit-inp {
+      flex: 1; background: transparent; border: none; border-bottom: 1px solid #7c8fd8;
+      color: #e2e8f0; font-size: 14px; font-weight: 700; outline: none;
+      font-family: inherit; padding: 1px 0; caret-color: #7c8fd8;
+    }
+    .btn-pencil {
+      flex-shrink: 0; background: none; border: none; cursor: pointer; color: #6470a8;
+      font-size: 12px; padding: 3px 5px; border-radius: 4px; transition: all .15s; line-height: 1;
+    }
+    .btn-pencil:hover { color: #e2e8f0; background: #232645; }
+    .btn-pencil.editing { color: #7c8fd8; background: #1c2040; }
 
     /* Street card */
     .street-card {
@@ -270,7 +299,21 @@
     #street-selector optgroup { font-size: 11px; color: #6470a8; font-style: normal; }
 
     /* ── STREET LIST ── */
-    #street-list { padding: 0 14px 6px; overflow-y: auto; max-height: 280px; }
+    #street-list-wrap { position: relative; }
+    #street-list-wrap::after {
+      content: ''; pointer-events: none;
+      position: absolute; bottom: 0; left: 0; right: 0; height: 28px;
+      background: linear-gradient(transparent, #13162b);
+      border-radius: 0 0 6px 6px;
+    }
+    #street-list {
+      padding: 0 14px 6px; overflow-y: scroll; max-height: 280px;
+      scrollbar-width: thin; scrollbar-color: #3d4270 transparent;
+    }
+    #street-list::-webkit-scrollbar { width: 4px; }
+    #street-list::-webkit-scrollbar-track { background: transparent; }
+    #street-list::-webkit-scrollbar-thumb { background: #3d4270; border-radius: 4px; }
+    #street-list::-webkit-scrollbar-thumb:hover { background: #5a6490; }
     .arr-group { margin-bottom: 4px; }
     .arr-header {
       font-size: 10px; font-weight: 700; color: #6470a8; text-transform: uppercase;
@@ -295,6 +338,12 @@
     .street-delete:hover { background: rgba(231,76,60,.15); color: #e74c3c; }
     .street-list-empty { font-size: 11px; color: #4a5280; padding: 4px 0; font-style: italic; }
     .street-list-item.loading .street-list-name { color: #6470a8; font-style: italic; }
+    .street-list-name { cursor: text; }
+    .street-rename-input {
+      background: transparent; border: none; border-bottom: 1px solid #7c8fd8;
+      color: #e2e8f0; font-size: 12px; font-weight: 600; width: 100%; outline: none;
+      padding: 0; font-family: inherit; caret-color: #7c8fd8;
+    }
   </style>
 </head>
 <body>
@@ -308,7 +357,10 @@
         <div class="logo-dot"></div>
         <div class="logo-text">Paris Geofencing</div>
       </div>
-      <div class="app-title">Éditeur de ligne</div>
+      <div class="header-row">
+        <div class="app-title" style="flex:1">Éditeur de ligne</div>
+        <button class="btn-undo" id="btn-undo" onclick="undo()" title="Annuler (Ctrl+Z)" disabled>↩</button>
+      </div>
     </div>
 
     <!-- Add street -->
@@ -330,8 +382,17 @@
         <option value="">— Sélectionner une rue —</option>
       </select>
     </div>
-    <div id="street-list">
-      <div class="street-list-empty">Aucune rue ajoutée</div>
+
+    <!-- Nom de la rue active + édition inline -->
+    <div id="street-name-bar">
+      <div id="street-name-display" class="empty">— aucune rue sélectionnée —</div>
+      <button class="btn-pencil" id="btn-pencil" onclick="toggleRenameBar()" title="Renommer la rue" style="display:none">✏</button>
+    </div>
+
+    <div id="street-list-wrap">
+      <div id="street-list">
+        <div class="street-list-empty">Aucune rue ajoutée</div>
+      </div>
     </div>
 
     <!-- Stats for active street -->
@@ -455,6 +516,7 @@ const STREET_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9
 let streets       = [];  // [{id, name, markers, polyline, hitPolyline, bufferLayer, origPts, color}]
 let activeStreetId = null;
 let streetIdCounter = 0;
+let undoStack     = [];   // snapshots pour Ctrl+Z
 let searchTimer   = null;  // debounce for autocomplete
 
 // Convenience: get active street object
@@ -485,7 +547,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
   subdomains: 'abcd', maxZoom: 20
 }).addTo(map);
 
-map.on('click', closeCtx);
+map.on('click', (e) => { closeCtx(); deselectAll(); });
 map.on('contextmenu', (e) => e.originalEvent.preventDefault());
 
 // ═══════════════════════════════════════════════════
@@ -1113,6 +1175,196 @@ async function addStreet() {
   }
 }
 
+// ═══════════════════════════════════════════════════
+//  UNDO — pile d'états (Ctrl+Z)
+// ═══════════════════════════════════════════════════
+const UNDO_MAX = 40;
+
+function pushUndoState() {
+  const snapshot = streets.map(s => ({
+    id: s.id, name: s.name, color: s.color, arrondissement: s.arrondissement,
+    origPts: s.origPts ? s.origPts.map(p => ({...p})) : null,
+    pts: s.markers.map(m => { const ll = m.getLatLng(); return {lat: ll.lat, lon: ll.lng}; })
+  }));
+  undoStack.push(snapshot);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  updateUndoBtn();
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('btn-undo');
+  if (btn) btn.disabled = undoStack.length === 0;
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const snapshot = undoStack.pop();
+  updateUndoBtn();
+
+  // Supprimer tous les layers actuels
+  streets.forEach(s => {
+    s.markers.forEach(m => m.remove());
+    if (s.polyline)    s.polyline.remove();
+    if (s.hitPolyline) s.hitPolyline.remove();
+    if (s.bufferLayer) s.bufferLayer.remove();
+  });
+  streets = [];
+
+  // Reconstruire depuis le snapshot
+  const prevActiveId = activeStreetId;
+  snapshot.forEach(snap => {
+    const s = {
+      id: snap.id, name: snap.name, color: snap.color, arrondissement: snap.arrondissement,
+      origPts: snap.origPts, markers: [], polyline: null, hitPolyline: null, bufferLayer: null, loading: false
+    };
+    streets.push(s);
+    buildLineForStreet(s, snap.pts);
+  });
+
+  // Restaurer la rue active
+  streetIdCounter = streets.length ? Math.max(...streets.map(s => s.id)) : 0;
+  const stillHere = streets.find(s => s.id === prevActiveId);
+  activeStreetId = stillHere ? prevActiveId : (streets.length ? streets[streets.length-1].id : null);
+
+  // Remettre les styles polylines
+  streets.forEach(s => {
+    if (!s.polyline) return;
+    if (s.id === activeStreetId) { s.polyline.setStyle({weight:6, opacity:1.0}); s.polyline.bringToFront(); }
+    else                          { s.polyline.setStyle({weight:3, opacity:0.6}); }
+  });
+
+  renderStreetList();
+  updateStats();
+  updateStreetNameBar();
+  if (showBuf) renderBuffer();
+  autoSave();
+  setStatus('↩ Action annulée', 'ready');
+}
+
+// ═══════════════════════════════════════════════════
+//  STREET NAME BAR — affichage + édition inline
+// ═══════════════════════════════════════════════════
+function updateStreetNameBar() {
+  const display = document.getElementById('street-name-display');
+  const pencil  = document.getElementById('btn-pencil');
+  if (!display || !pencil) return;
+
+  // Sortir du mode édition si actif
+  const inp = document.getElementById('street-name-edit-inp');
+  if (inp) { inp.remove(); display.style.display = ''; }
+  pencil.classList.remove('editing');
+
+  const s = getActive();
+  if (s) {
+    display.textContent = s.name;
+    display.classList.remove('empty');
+    pencil.style.display = '';
+  } else {
+    display.textContent = '— aucune rue sélectionnée —';
+    display.classList.add('empty');
+    pencil.style.display = 'none';
+  }
+}
+
+function toggleRenameBar() {
+  const s = getActive(); if (!s) return;
+  const display = document.getElementById('street-name-display');
+  const pencil  = document.getElementById('btn-pencil');
+  const bar     = document.getElementById('street-name-bar');
+
+  // Si déjà en mode édition → sauvegarder
+  const existing = document.getElementById('street-name-edit-inp');
+  if (existing) { applyRenameBar(existing.value); return; }
+
+  // Passer en mode édition
+  pencil.classList.add('editing');
+  display.style.display = 'none';
+
+  const inp = document.createElement('input');
+  inp.id = 'street-name-edit-inp';
+  inp.value = s.name;
+  inp.addEventListener('click',   e => e.stopPropagation());
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter')  { e.preventDefault(); applyRenameBar(e.target.value); }
+    if (e.key === 'Escape') { inp._cancel = true; updateStreetNameBar(); }
+  });
+  inp.addEventListener('blur', () => {
+    if (inp._cancel) return;
+    applyRenameBar(inp.value);
+  });
+  bar.insertBefore(inp, pencil);
+  inp.focus(); inp.select();
+}
+
+function applyRenameBar(newName) {
+  const s = getActive();
+  if (!s) { updateStreetNameBar(); return; }
+  const trimmed = newName.trim();
+  if (trimmed && trimmed !== s.name) {
+    pushUndoState();   // capture l'état AVANT le renommage
+    s.name = trimmed;
+    renderStreetList();
+    autoSave();
+  }
+  updateStreetNameBar();
+}
+
+// ═══════════════════════════════════════════════════
+//  RENAME — double-clic sur le nom dans la liste
+// ═══════════════════════════════════════════════════
+function startRename(id, e) {
+  e.stopPropagation();
+  const s = streets.find(st => st.id === id);
+  if (!s || s.loading) return;
+
+  // Sélectionner la rue si elle ne l'est pas déjà
+  if (activeStreetId !== id) selectStreet(id);
+
+  const el = document.querySelector(`#street-list [data-sid="${id}"] .street-list-name`);
+  if (!el || el.querySelector('input')) return; // déjà en cours d'édition
+
+  // Remplacer le texte par un input inline
+  el.innerHTML = '';
+  const inp = document.createElement('input');
+  inp.className = 'street-rename-input';
+  inp.value = s.name;
+
+  inp.addEventListener('click',   ev => ev.stopPropagation());
+  inp.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter')  { ev.preventDefault(); inp._confirmed = true; inp.blur(); }
+    if (ev.key === 'Escape') { inp._cancelled = true; inp.blur(); }
+  });
+  inp.addEventListener('blur', () => {
+    if (inp._cancelled) { renderStreetList(); return; }
+    const trimmed = inp.value.trim();
+    if (!trimmed) { renderStreetList(); return; }
+    pushUndoState();
+    s.name = trimmed;
+    renderStreetList();
+    updateStreetNameBar();
+    autoSave();
+  });
+
+  el.appendChild(inp);
+  inp.focus();
+  inp.select();
+}
+
+function deselectAll() {
+  activeStreetId = null;
+  streets.forEach(s => {
+    if (!s.polyline) return;
+    s.polyline.setStyle({ weight: 3, opacity: 0.6 });
+  });
+  renderStreetList();
+  updateStats();
+  updateStreetNameBar();
+  const sel = document.getElementById('street-selector');
+  if (sel) sel.value = '';
+}
+
 function selectStreet(id) {
   activeStreetId = id;
 
@@ -1131,6 +1383,7 @@ function selectStreet(id) {
 
   renderStreetList();
   updateStats();
+  updateStreetNameBar();
 
   // Sync dropdown
   const sel = document.getElementById('street-selector');
@@ -1151,6 +1404,7 @@ function removeStreet(id, ev) {
   if (ev) ev.stopPropagation();
   const s = streets.find(s => s.id === id);
   if (!s) return;
+  pushUndoState();
 
   // Remove from map
   s.markers.forEach(m => m.remove());
@@ -1230,7 +1484,7 @@ function renderStreetList() {
       const loading = s.loading ? ' loading' : '';
       return `<div class="street-list-item${active}${loading}" data-sid="${s.id}" onclick="selectStreet(${s.id})">
         <div class="street-dot" style="background:${s.color}"></div>
-        <div class="street-list-name" title="${s.name}">${s.name}</div>
+        <div class="street-list-name" title="Double-clic pour renommer" ondblclick="startRename(${s.id}, event)">${s.name}</div>
         <div class="street-list-meta">${getMeta(s)}</div>
         <button class="street-delete" onclick="removeStreet(${s.id},event)" title="Supprimer">✕</button>
       </div>`;
@@ -1323,6 +1577,7 @@ function spawnMarker(pt, idx) {
   m.bindTooltip('', {direction:'top', className:'handle-tooltip', opacity:1});
   m._streetId = s.id;  // tag marker with its street
 
+  m.on('dragstart', () => pushUndoState());
   m.on('drag', () => {
     // Ensure this marker's street is active
     if (activeStreetId !== m._streetId) selectStreet(m._streetId);
@@ -1331,6 +1586,11 @@ function spawnMarker(pt, idx) {
     updateTooltip(m, s.markers.indexOf(m));
   });
   m.on('dragend', () => { updateStats(); renderStreetList(); autoSave(); });
+
+  m.on('click', e => {
+    L.DomEvent.stopPropagation(e);
+    if (activeStreetId !== m._streetId) selectStreet(m._streetId);
+  });
 
   m.on('contextmenu', e => {
     if (activeStreetId !== m._streetId) selectStreet(m._streetId);
@@ -1582,6 +1842,7 @@ function closeCtx() {
 
 // ── BUG FIX: save state BEFORE calling closeCtx ──
 function ctxAdd() {
+  pushUndoState();
   const latlng = ctxState.latlng;   // ← save first
   const idx    = ctxState.idx;
   closeCtx();                        // ← then close (resets ctxState)
@@ -1596,6 +1857,7 @@ function ctxAdd() {
 }
 
 function ctxDelete() {
+  pushUndoState();
   const idx = ctxState.idx;         // ← save first
   closeCtx();
   const s = getActive(); if (!s) return;
@@ -1611,7 +1873,15 @@ function ctxDelete() {
 }
 
 document.addEventListener('click', e => { if (!e.target.closest('#ctx-menu')) closeCtx(); });
-document.addEventListener('keydown', e => { if (e.key==='Escape') closeCtx(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCtx();
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    // Ne pas interférer si un input est en cours d'édition
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    e.preventDefault();
+    undo();
+  }
+});
 
 // ═══════════════════════════════════════════════════
 //  STATS & UI
@@ -1644,6 +1914,7 @@ function fitStreet() {
 function resetLine() {
   const s = getActive();
   if (!s || !s.origPts) return;
+  pushUndoState();
   buildLineForStreet(s, s.origPts); updateStats();
   setStatus('Ligne réinitialisée','ready');
   if (showBuf) renderBuffer();
