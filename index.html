@@ -736,7 +736,7 @@ function resample(path, interval=100) {
 // ═══════════════════════════════════════════════════
 //  OVERPASS FETCH — GÉNÉRIQUE POUR TOUTE RUE
 // ═══════════════════════════════════════════════════
-const PARIS_BBOX = '48.81,2.22,48.91,2.47'; // Grand Paris
+const PARIS_AREA = 'area["name"="Paris"]["admin_level"="8"]["boundary"="administrative"]->.paris;'; // Paris intra-muros uniquement
 
 /**
  * Détecte les tronçons disjoints dans une liste de points dédoublonnés.
@@ -761,7 +761,8 @@ function detectSegments(deduped) {
 async function fixDirectionByHousenumber(anchors, streetName) {
   try {
     const q = `[out:json][timeout:20];
-node["addr:street"="${streetName.replace(/"/g,'\\"')}"]["addr:housenumber"](${PARIS_BBOX});
+${PARIS_AREA}
+node["addr:street"="${streetName.replace(/"/g,'\\"')}"]["addr:housenumber"](area.paris);
 out;`;
     const r = await fetch('https://overpass-api.de/api/interpreter', {
       method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -807,8 +808,9 @@ out;`;
 async function fetchStreetGeometry(streetName) {
   // Requête 1 : ways "highway"
   let query = `[out:json][timeout:60];
+${PARIS_AREA}
 (
-  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"](${PARIS_BBOX});
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"](area.paris);
 );
 out geom;`;
   let res = await fetch('https://overpass-api.de/api/interpreter', {
@@ -822,11 +824,12 @@ out geom;`;
   // Fallback : promenades, footways, etc. sans "highway"
   if (!allWays.length) {
     const q2 = `[out:json][timeout:60];
+${PARIS_AREA}
 (
-  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"~"."](${PARIS_BBOX});
-  way["name"="${streetName.replace(/"/g,'\\"')}"]["leisure"~"."](${PARIS_BBOX});
-  way["name"="${streetName.replace(/"/g,'\\"')}"]["tourism"~"."](${PARIS_BBOX});
-  way["name"="${streetName.replace(/"/g,'\\"')}"]["waterway"~"."](${PARIS_BBOX});
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"~"."](area.paris);
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["leisure"~"."](area.paris);
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["tourism"~"."](area.paris);
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["waterway"~"."](area.paris);
 );
 out geom;`;
     const r2 = await fetch('https://overpass-api.de/api/interpreter', {
@@ -918,7 +921,8 @@ async function searchStreetNames(input) {
 
   const regex = toFlexRegex(input);
   const query = `[out:json][timeout:15];
-way["name"~"${regex}",i]["highway"](${PARIS_BBOX});
+${PARIS_AREA}
+way["name"~"${regex}",i]["highway"](area.paris);
 out tags;`;
 
   try {
@@ -954,7 +958,8 @@ out tags;`;
 async function findOfficialName(input) {
   // 1) D'abord essayer un match exact (rapide)
   const exactQuery = `[out:json][timeout:15];
-way["name"="${input.replace(/"/g,'\\"')}"]["highway"](${PARIS_BBOX});
+${PARIS_AREA}
+way["name"="${input.replace(/"/g,'\\"')}"]["highway"](area.paris);
 out ids;`;
   try {
     const r1 = await fetch('https://overpass-api.de/api/interpreter', {
@@ -971,7 +976,8 @@ out ids;`;
   // 2) Recherche floue : espaces/tirets flexibles, insensible à la casse
   const regex = toFlexRegex(input);
   const fuzzyQuery = `[out:json][timeout:15];
-way["name"~"${regex}",i]["highway"](${PARIS_BBOX});
+${PARIS_AREA}
+way["name"~"${regex}",i]["highway"](area.paris);
 out tags;`;
 
   const r2 = await fetch('https://overpass-api.de/api/interpreter', {
@@ -2142,127 +2148,34 @@ async function loadLatestSave() {
 //  Mis à jour le 24/03/2026
 // ═══════════════════════════════════════════════════
 function getEmbeddedGeoJSON() {
-  // Données mises à jour le 24/03/2026 — 105 rues
+  // Données mises à jour le 24/03/2026 — 92 rues (dédupliquées, intra-muros, avec arrondissements)
   return {
   "type": "FeatureCollection",
   "features": [
     {
       "type": "Feature",
       "properties": {
-        "name": "Rue de Rivoli",
-        "color": "#e74c3c",
-        "arrondissement": "1er"
+        "name": "Allée Célestin Hennion",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 66,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "4e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.323597669601441,
-            48.86637332881225
+            2.3473459482192998,
+            48.8551751699283
           ],
           [
-            2.324096560478211,
-            48.86629216617396
-          ],
-          [
-            2.325915098190308,
-            48.86571343745897
-          ],
-          [
-            2.327036261558533,
-            48.865353493053135
-          ],
-          [
-            2.328312993049622,
-            48.86493708354968
-          ],
-          [
-            2.330083250999451,
-            48.86435128126382
-          ],
-          [
-            2.3318213224411015,
-            48.8638007620223
-          ],
-          [
-            2.333637177944184,
-            48.86322200449507
-          ],
-          [
-            2.3353162407875065,
-            48.86269088270434
-          ],
-          [
-            2.337081134319306,
-            48.86214387430383
-          ],
-          [
-            2.338545620441437,
-            48.86166744276122
-          ],
-          [
-            2.339822351932526,
-            48.86125276717152
-          ],
-          [
-            2.3407343029975896,
-            48.86096337451177
-          ],
-          [
-            2.341750860214234,
-            48.86060868976249
-          ],
-          [
-            2.3431563377380376,
-            48.860158712956114
-          ],
-          [
-            2.3448085784912114,
-            48.85962050009043
-          ],
-          [
-            2.3466056585311894,
-            48.85905757618
-          ],
-          [
-            2.3483303189277653,
-            48.85847346975592
-          ],
-          [
-            2.350113987922669,
-            48.85792288585892
-          ],
-          [
-            2.3515462875366215,
-            48.8574728849071
-          ],
-          [
-            2.3538476228713994,
-            48.85693287842495
-          ],
-          [
-            2.3551404476165776,
-            48.85663993129474
-          ],
-          [
-            2.3566639423370366,
-            48.856269333071424
-          ],
-          [
-            2.358192801475525,
-            48.85589520255827
-          ],
-          [
-            2.3595553636550903,
-            48.855612838055364
-          ],
-          [
-            2.3608911037445073,
-            48.855266939368754
-          ],
-          [
-            2.3619854450225835,
-            48.854959864042286
+            2.3476812243461613,
+            48.85572931360579
           ]
         ]
       }
@@ -2271,8 +2184,15 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Boulevard Saint-Germain",
-        "color": "#3498db",
-        "arrondissement": "6e"
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 3203,
+        "anchor_count": 33,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "7e"
       },
       "geometry": {
         "type": "LineString",
@@ -2394,8 +2314,8 @@ function getEmbeddedGeoJSON() {
             48.849696844714245
           ],
           [
-            2.351516295325569,
-            48.849575341535456
+            2.3504975438117985,
+            48.849617510830136
           ],
           [
             2.3528803745317863,
@@ -2406,16 +2326,2450 @@ function getEmbeddedGeoJSON() {
             48.84946037592752
           ],
           [
-            2.3556052310174964,
-            48.84938189831415
+            2.3556876182556157,
+            48.849368645992264
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard Saint-Michel",
+        "color": "#2ecc71",
+        "arrondissement": "5e",
+        "line_color": "#2ecc71"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3441309,
+            48.8533927
           ],
           [
-            2.3569149364297504,
-            48.84929148686634
+            2.3437531,
+            48.8527668
           ],
           [
-            2.3572253,
-            48.8492523
+            2.3433548,
+            48.851919
+          ],
+          [
+            2.3430393,
+            48.8512675
+          ],
+          [
+            2.3425679,
+            48.8503131
+          ],
+          [
+            2.3422205,
+            48.8496066
+          ],
+          [
+            2.3416298,
+            48.8486287
+          ],
+          [
+            2.3410612,
+            48.8478514
+          ],
+          [
+            2.3407055,
+            48.8472625
+          ],
+          [
+            2.3403841,
+            48.8467411
+          ],
+          [
+            2.3400044,
+            48.8457998
+          ],
+          [
+            2.3388852,
+            48.8437288
+          ],
+          [
+            2.338569,
+            48.8431566
+          ],
+          [
+            2.3380313,
+            48.8423783
+          ],
+          [
+            2.3377545,
+            48.8416774
+          ],
+          [
+            2.3373138,
+            48.8409292
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard du Palais",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 210,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#f1c40f",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3464071750640874,
+            48.85606109096103
+          ],
+          [
+            2.3462837934494023,
+            48.85588461391817
+          ],
+          [
+            2.3461335897445683,
+            48.85564107457732
+          ],
+          [
+            2.345870733261109,
+            48.85531635361317
+          ],
+          [
+            2.345243096351624,
+            48.854666905365924
+          ],
+          [
+            2.3450016975402836,
+            48.85441806562564
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Cour de Rohan",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 46,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#1abc9c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3391414,
+            48.8530827
+          ],
+          [
+            2.33934760093689,
+            48.853092664326454
+          ],
+          [
+            2.33959436416626,
+            48.85297618264145
+          ],
+          [
+            2.33959972858429,
+            48.85289852803421
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Passage Dauphine",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 88,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#2ecc71",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3380574584007268,
+            48.854776323867306
+          ],
+          [
+            2.3386904597282414,
+            48.854876918085004
+          ],
+          [
+            2.339194715023041,
+            48.85472867390418
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont Neuf",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 254,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3406404256820683,
+            48.85630109874092
+          ],
+          [
+            2.3412787914276127,
+            48.857056409833454
+          ],
+          [
+            2.341750860214234,
+            48.85762817981037
+          ],
+          [
+            2.3423114418983464,
+            48.85830229528282
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont Saint-Louis",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 66,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#16a085",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.352310717105866,
+            48.85267085815059
+          ],
+          [
+            2.3531717061996464,
+            48.85283852211883
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont au Double",
+        "color": "#9b59b6",
+        "arrondissement": "5e",
+        "line_color": "#9b59b6"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3483812808990483,
+            48.85253143189675
+          ],
+          [
+            2.348510026931763,
+            48.85269027190197
+          ],
+          [
+            2.3482798,
+            48.8523914
+          ],
+          [
+            2.3485529,
+            48.8527643
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont de l'Archevêché",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 51,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3514443635940556,
+            48.851371884591735
+          ],
+          [
+            2.3517152667045598,
+            48.85179193679365
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Port de Montebello",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 363,
+        "anchor_count": 8,
+        "buffer_width_m": 12,
+        "line_color": "#e67e22",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3470228,
+            48.8531209
+          ],
+          [
+            2.347868978977204,
+            48.852708803203065
+          ],
+          [
+            2.3481117188930516,
+            48.85257467172586
+          ],
+          [
+            2.3484456539154057,
+            48.85240435952973
+          ],
+          [
+            2.3489914834499364,
+            48.85219257153464
+          ],
+          [
+            2.349801510572434,
+            48.851874005404774
+          ],
+          [
+            2.3505270481109624,
+            48.851618974549076
+          ],
+          [
+            2.35120564699173,
+            48.85138247418634
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Port de la Tournelle",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 589,
+        "anchor_count": 13,
+        "buffer_width_m": 12,
+        "line_color": "#d35400",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.351683080196381,
+            48.85126598852243
+          ],
+          [
+            2.352269142866135,
+            48.85118127150571
+          ],
+          [
+            2.3526969552040105,
+            48.85109831928798
+          ],
+          [
+            2.3534278571605687,
+            48.85086446389171
+          ],
+          [
+            2.353867739439011,
+            48.85072503260736
+          ],
+          [
+            2.35457718372345,
+            48.85051764991561
+          ],
+          [
+            2.3549057543277745,
+            48.850311148849904
+          ],
+          [
+            2.3559544980525975,
+            48.849999630673494
+          ],
+          [
+            2.3570716381073002,
+            48.8496439857401
+          ],
+          [
+            2.3580707609653477,
+            48.8493377584261
+          ],
+          [
+            2.358575016260147,
+            48.84917008273446
+          ],
+          [
+            2.358786910772324,
+            48.84909418723681
+          ],
+          [
+            2.358903586864472,
+            48.84901123156127
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Promenade Maurice Carême",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 362,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.347217202186585,
+            48.853380337629815
+          ],
+          [
+            2.348413467407227,
+            48.85283146259467
+          ],
+          [
+            2.3498189449310307,
+            48.852316114640665
+          ],
+          [
+            2.3509266972541814,
+            48.85202314049355
+          ],
+          [
+            2.3515753,
+            48.8518811
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai Saint-Michel",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 165,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#d35400",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3446100950241093,
+            48.85367859838918
+          ],
+          [
+            2.345688343048096,
+            48.85339269166104
+          ],
+          [
+            2.3467022180557255,
+            48.85312796175326
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai aux Fleurs",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 286,
+        "anchor_count": 7,
+        "buffer_width_m": 12,
+        "line_color": "#8e44ad",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3504278063774113,
+            48.85499692495749
+          ],
+          [
+            2.3509186506271367,
+            48.85474985167116
+          ],
+          [
+            2.3512954955570393,
+            48.85448215906825
+          ],
+          [
+            2.3518225550651555,
+            48.85394861991097
+          ],
+          [
+            2.352012991905213,
+            48.85357623690874
+          ],
+          [
+            2.3521015048027043,
+            48.85323208901733
+          ],
+          [
+            2.352155148983002,
+            48.8528155786616
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Conti",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 333,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3401898145675664,
+            48.856332864390275
+          ],
+          [
+            2.3397874832153325,
+            48.85653404636806
+          ],
+          [
+            2.3392564058303837,
+            48.85683758255869
+          ],
+          [
+            2.33810305595398,
+            48.85745876716474
+          ],
+          [
+            2.337207198143006,
+            48.857674062303225
+          ],
+          [
+            2.33635425567627,
+            48.85787170948396
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Gesvres",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 237,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#e67e22",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3505270481109624,
+            48.85615285877746
+          ],
+          [
+            2.349592776887797,
+            48.85647832167039
+          ],
+          [
+            2.3489794135093693,
+            48.85670346214328
+          ],
+          [
+            2.3476302623748784,
+            48.85709523392743
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Montebello",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 289,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3502802848815922,
+            48.85147778043706
+          ],
+          [
+            2.3495292663574223,
+            48.85179193679365
+          ],
+          [
+            2.3482739925384526,
+            48.85234964771682
+          ],
+          [
+            2.3478046059608464,
+            48.85256672971922
+          ],
+          [
+            2.3470240831375127,
+            48.85295323924729
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Archevêché",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 75,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#d35400",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3517930507659917,
+            48.85192254054161
+          ],
+          [
+            2.35198333676471,
+            48.852213333725395
+          ],
+          [
+            2.3521953821182255,
+            48.85254731591993
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Horloge",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 361,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3417776823043828,
+            48.85711994015339
+          ],
+          [
+            2.3427004154038515,
+            48.85699680249374
+          ],
+          [
+            2.344043704199383,
+            48.8568398832992
+          ],
+          [
+            2.345348701490937,
+            48.85657376288746
+          ],
+          [
+            2.3464808,
+            48.8561977
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Hôtel de Ville",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 537,
+        "anchor_count": 8,
+        "buffer_width_m": 12,
+        "line_color": "#16a085",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.351385354995728,
+            48.85584225933529
+          ],
+          [
+            2.351892985081042,
+            48.855625483781076
+          ],
+          [
+            2.3528176546096806,
+            48.85526164498255
+          ],
+          [
+            2.353359460830689,
+            48.854991630542706
+          ],
+          [
+            2.354276776313782,
+            48.8546280793886
+          ],
+          [
+            2.3551887273788457,
+            48.854268055255545
+          ],
+          [
+            2.35682487487793,
+            48.85367859838918
+          ],
+          [
+            2.3576831817626958,
+            48.853378572767966
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Corse",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 267,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3467236757278447,
+            48.856110504421544
+          ],
+          [
+            2.347732620923424,
+            48.85583659548454
+          ],
+          [
+            2.3495990037918095,
+            48.85530223526261
+          ],
+          [
+            2.3500549793243413,
+            48.85512575554453
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Mégisserie",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 302,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#1abc9c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3428264260292058,
+            48.85837641213684
+          ],
+          [
+            2.34372973689139,
+            48.85814258558996
+          ],
+          [
+            2.344995173782779,
+            48.85780257117992
+          ],
+          [
+            2.346260610674169,
+            48.85746255676988
+          ],
+          [
+            2.346645891666413,
+            48.857352883970066
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Tournelle",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 425,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#f1c40f",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3505967855453496,
+            48.85135247032912
+          ],
+          [
+            2.351409494876862,
+            48.85107008020376
+          ],
+          [
+            2.3528652181712886,
+            48.850632555275965
+          ],
+          [
+            2.3540943861007695,
+            48.850224665244546
+          ],
+          [
+            2.355301380157471,
+            48.84984342961185
+          ],
+          [
+            2.3558190464973454,
+            48.8496863455669
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai des Grands Augustins",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 333,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#f1c40f",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.344046831130982,
+            48.85389390978565
+          ],
+          [
+            2.3433101911751772,
+            48.85423728127996
+          ],
+          [
+            2.3422736303906646,
+            48.85481775206455
+          ],
+          [
+            2.3413680651953324,
+            48.855491376032276
+          ],
+          [
+            2.3407316207885747,
+            48.8559269684652
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai des Orfèvres",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 348,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3414558172225957,
+            48.85674581599748
+          ],
+          [
+            2.341978936457506,
+            48.85625478329137
+          ],
+          [
+            2.3427930336500493,
+            48.85553239594167
+          ],
+          [
+            2.3433387279510502,
+            48.8550375154522
+          ],
+          [
+            2.3439878225326543,
+            48.85472337946103
+          ],
+          [
+            2.344615459442139,
+            48.85445865658967
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai du Louvre",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 171,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.342273890972138,
+            48.858524645515665
+          ],
+          [
+            2.341159184410777,
+            48.85873561174439
+          ],
+          [
+            2.340028882026673,
+            48.85895875502838
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai du Marché Neuf - Maurice Grimaud",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 150,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#2980b9",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3451089859008794,
+            48.854264525594374
+          ],
+          [
+            2.3460853099823002,
+            48.853918617591596
+          ],
+          [
+            2.3469221591949467,
+            48.85363977164536
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Aubé",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 61,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.347069680690766,
+            48.85528458731878
+          ],
+          [
+            2.347388863563538,
+            48.85579284560999
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Bonaparte",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 999,
+        "anchor_count": 17,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.335276007652283,
+            48.85759994440924
+          ],
+          [
+            2.3350721597671513,
+            48.85721170602874
+          ],
+          [
+            2.3348414897918706,
+            48.85683758255869
+          ],
+          [
+            2.334174642668384,
+            48.855871320943734
+          ],
+          [
+            2.333934903144837,
+            48.8554981270211
+          ],
+          [
+            2.333776652812958,
+            48.85495280481723
+          ],
+          [
+            2.333637177944184,
+            48.85449748269842
+          ],
+          [
+            2.33335554599762,
+            48.85384978867328
+          ],
+          [
+            2.333382368087769,
+            48.853602709725465
+          ],
+          [
+            2.333181202411652,
+            48.852778516131565
+          ],
+          [
+            2.3328995704650883,
+            48.8514513064967
+          ],
+          [
+            2.3328727483749394,
+            48.85129422749614
+          ],
+          [
+            2.3329398036003117,
+            48.851188331262584
+          ],
+          [
+            2.3327760518066336,
+            48.85058001145293
+          ],
+          [
+            2.33273059129715,
+            48.85027584943718
+          ],
+          [
+            2.3326984047889714,
+            48.85013288656123
+          ],
+          [
+            2.3327466845512395,
+            48.8488867977903
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Boutebrie",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 51,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.344513535499573,
+            48.8512042157119
+          ],
+          [
+            2.3447549343109135,
+            48.85163485886176
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Cardinale",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 56,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.335951924324036,
+            48.85404303885762
+          ],
+          [
+            2.3361249268054967,
+            48.85425217177828
+          ],
+          [
+            2.3361182212829594,
+            48.85438982841383
+          ],
+          [
+            2.335951924324036,
+            48.85445071488193
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Chanoinesse",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 189,
+        "anchor_count": 11,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3498994112014775,
+            48.85432452980058
+          ],
+          [
+            2.3501247167587285,
+            48.85423805312761
+          ],
+          [
+            2.3507885634899144,
+            48.853801255404754
+          ],
+          [
+            2.3508824408054356,
+            48.85372624935179
+          ],
+          [
+            2.350915968418122,
+            48.85363712436627
+          ],
+          [
+            2.3511198163032536,
+            48.853525938518366
+          ],
+          [
+            2.3512284457683568,
+            48.853425341586046
+          ],
+          [
+            2.3513022065162663,
+            48.85328856473101
+          ],
+          [
+            2.351304888725281,
+            48.8531914970588
+          ],
+          [
+            2.3512794077396397,
+            48.85312707931788
+          ],
+          [
+            2.351225763559342,
+            48.85301412746254
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Christine",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 82,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3404419422149663,
+            48.85432100014338
+          ],
+          [
+            2.3394414782524113,
+            48.85464925719815
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Cochin",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 57,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.352383136749268,
+            48.85022996016346
+          ],
+          [
+            2.35308051109314,
+            48.85000404312578
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Dante",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 96,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.345919013023377,
+            48.85096771339001
+          ],
+          [
+            2.346568107604981,
+            48.851214805341975
+          ],
+          [
+            2.3470562696456914,
+            48.85139835857405
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Danton",
+        "line_color": "#9b59b6",
+        "color": "#9b59b6",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3427976,
+            48.8529505
+          ],
+          [
+            2.3412746,
+            48.8523153
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Dauphine",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 272,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#2980b9",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.338545620441437,
+            48.853789783898065
+          ],
+          [
+            2.3390901088714604,
+            48.85442512492611
+          ],
+          [
+            2.339752614498139,
+            48.855222819466455
+          ],
+          [
+            2.340275645256043,
+            48.85584578888524
+          ],
+          [
+            2.340348064899445,
+            48.8559269684652
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Domat",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 85,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.347442507743836,
+            48.85070120570348
+          ],
+          [
+            2.3469060659408574,
+            48.85085828656454
+          ],
+          [
+            2.3463803529739384,
+            48.85100654220607
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Frédéric Sauton",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 90,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.348858714103699,
+            48.85052647472848
+          ],
+          [
+            2.349110841751099,
+            48.850974773176986
+          ],
+          [
+            2.3492556810379033,
+            48.85128893268979
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Galande",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 151,
+        "anchor_count": 7,
+        "buffer_width_m": 12,
+        "line_color": "#e67e22",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3478743433952336,
+            48.851271283331215
+          ],
+          [
+            2.3477724194526677,
+            48.851250104092706
+          ],
+          [
+            2.3473969101905827,
+            48.85144424677692
+          ],
+          [
+            2.3471501469612126,
+            48.851518373785034
+          ],
+          [
+            2.3468309640884404,
+            48.85176193318182
+          ],
+          [
+            2.34659492969513,
+            48.852081382478595
+          ],
+          [
+            2.3464339971542363,
+            48.852136094584644
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Guénégaud",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 182,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#d35400",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3378428816795354,
+            48.855319883200195
+          ],
+          [
+            2.339779436588288,
+            48.85634698245018
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Gît-le-Cœur",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 96,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.34234631061554,
+            48.85338916193815
+          ],
+          [
+            2.342716455459595,
+            48.85379860813421
+          ],
+          [
+            2.343022227287293,
+            48.85413392795578
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Hautefeuille",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 253,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3432362,
+            48.8528759
+          ],
+          [
+            2.342893481254578,
+            48.85238847546116
+          ],
+          [
+            2.342595756053925,
+            48.85206549830759
+          ],
+          [
+            2.3420056700706486,
+            48.85166133270504
+          ],
+          [
+            2.341817915439606,
+            48.85147778043706
+          ],
+          [
+            2.3413833975791936,
+            48.850974773176986
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Jacob",
+        "color": "#9b59b6",
+        "arrondissement": "6e",
+        "line_color": "#9b59b6"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3340709,
+            48.8554601
+          ],
+          [
+            2.3335906,
+            48.8556295
+          ],
+          [
+            2.3324748,
+            48.8560282
+          ],
+          [
+            2.3320977,
+            48.8561629
+          ],
+          [
+            2.3316717,
+            48.8563151
+          ],
+          [
+            2.3368794,
+            48.8545063
+          ],
+          [
+            2.336101,
+            48.8547693
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Lagrange",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 211,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#1abc9c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.348185479640961,
+            48.85224551861739
+          ],
+          [
+            2.347885072231293,
+            48.851825470220916
+          ],
+          [
+            2.347742915153504,
+            48.851684276691216
+          ],
+          [
+            2.3477777838706975,
+            48.85156602680373
+          ],
+          [
+            2.3483222723007207,
+            48.85087593606868
+          ],
+          [
+            2.348542213439942,
+            48.85054412434962
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Massillon",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 44,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#2980b9",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3506088554859166,
+            48.85322944171669
+          ],
+          [
+            2.350738942623139,
+            48.85339092679963
+          ],
+          [
+            2.350865006446839,
+            48.85358329632789
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Mazarine",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 387,
+        "anchor_count": 8,
+        "buffer_width_m": 12,
+        "line_color": "#2980b9",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3383069038391118,
+            48.85385331836371
+          ],
+          [
+            2.3380358763794407,
+            48.854533868019786
+          ],
+          [
+            2.3377087712287907,
+            48.855386945306286
+          ],
+          [
+            2.337354719638825,
+            48.85626756831142
+          ],
+          [
+            2.33709990978241,
+            48.856855229955016
+          ],
+          [
+            2.336981892585755,
+            48.85700523257262
+          ],
+          [
+            2.3368489675891877,
+            48.85705952789877
+          ],
+          [
+            2.336700260639191,
+            48.85709346919654
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Maître Albert",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 164,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.350360751152039,
+            48.851366589793585
+          ],
+          [
+            2.349910140037537,
+            48.85086181646588
+          ],
+          [
+            2.349464893341065,
+            48.850413517006025
+          ],
+          [
+            2.3489284515380864,
+            48.850402927206474
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Mignon",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 41,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#16a085",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.341520190238953,
+            48.851949014232765
+          ],
+          [
+            2.3417615890502934,
+            48.85227728684016
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Saint-André des Arts",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 325,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3430329561233525,
+            48.85322326468132
+          ],
+          [
+            2.3427137732505803,
+            48.853274445808566
+          ],
+          [
+            2.3420834541320805,
+            48.85332386201968
+          ],
+          [
+            2.3408094048500065,
+            48.853399751106096
+          ],
+          [
+            2.339779436588288,
+            48.853484464369
+          ],
+          [
+            2.3386341333389287,
+            48.85362212311549
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Saint-Séverin",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 166,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3440361022949223,
+            48.85271145053124
+          ],
+          [
+            2.3445376753807072,
+            48.85256672971922
+          ],
+          [
+            2.3448032140731816,
+            48.85247142554141
+          ],
+          [
+            2.3451009392738347,
+            48.852441422336746
+          ],
+          [
+            2.345669567584992,
+            48.85229670074419
+          ],
+          [
+            2.3461604118347172,
+            48.85220492585896
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Serpente",
+        "line_color": "#d35400",
+        "color": "#d35400",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3433796,
+            48.8518427
+          ],
+          [
+            2.3418689,
+            48.8523823
+          ],
+          [
+            2.3406504,
+            48.8524911
+          ],
+          [
+            2.3405938,
+            48.852497
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Suger",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 134,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.342721819877625,
+            48.853007950400595
+          ],
+          [
+            2.342523336410523,
+            48.85301853964918
+          ],
+          [
+            2.3420807719230656,
+            48.852997361149775
+          ],
+          [
+            2.3413646221160893,
+            48.85293912023029
+          ],
+          [
+            2.340900599956513,
+            48.852929413403785
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Séguier",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 131,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3415631055831914,
+            48.85344563747463
+          ],
+          [
+            2.3420405387878422,
+            48.854073923521135
+          ],
+          [
+            2.3424106836318974,
+            48.85448689376265
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Visconti",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 163,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.334406971931458,
+            48.85590932074161
+          ],
+          [
+            2.33660638332367,
+            48.85567989976902
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Xavier Privas",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 95,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#f1c40f",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.345854337570636,
+            48.853253645609676
+          ],
+          [
+            2.34559714794159,
+            48.85289499827648
+          ],
+          [
+            2.3451572656631474,
+            48.85253496168011
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue d'Arcole",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 152,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#16a085",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3492503166198735,
+            48.8537015414509
+          ],
+          [
+            2.349487208641471,
+            48.85401779532869
+          ],
+          [
+            2.349782034320006,
+            48.85442345854254
+          ],
+          [
+            2.3501515388488774,
+            48.85493692155721
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Buci",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 178,
+        "anchor_count": 7,
+        "buffer_width_m": 12,
+        "line_color": "#1abc9c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.336005568504334,
+            48.85331503769984
+          ],
+          [
+            2.3361369967460637,
+            48.853436813176245
+          ],
+          [
+            2.336499094963074,
+            48.85367330383499
+          ],
+          [
+            2.336877286434174,
+            48.85383037537152
+          ],
+          [
+            2.337201833724976,
+            48.853851553518524
+          ],
+          [
+            2.337826788425446,
+            48.853759781483475
+          ],
+          [
+            2.33809769153595,
+            48.85371918995279
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Harlay",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 111,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#1abc9c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3426574468612675,
+            48.85588461391817
+          ],
+          [
+            2.3428684296932056,
+            48.85615637243733
+          ],
+          [
+            2.343185609319394,
+            48.856554674004244
+          ],
+          [
+            2.343365550041199,
+            48.85677052239589
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Lutèce",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 183,
+        "anchor_count": 8,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.34609603881836,
+            48.855249291412505
+          ],
+          [
+            2.3463749885559086,
+            48.855153992341236
+          ],
+          [
+            2.3464795947074895,
+            48.8553216479936
+          ],
+          [
+            2.346289157867432,
+            48.855443418589125
+          ],
+          [
+            2.3467290401458745,
+            48.85529870567434
+          ],
+          [
+            2.346745133399964,
+            48.855134579545215
+          ],
+          [
+            2.3470535874366765,
+            48.8550092785898
+          ],
+          [
+            2.3475337028503422,
+            48.85484868113202
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Nevers",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 133,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#8e44ad",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3386577,
+            48.8553621
+          ],
+          [
+            2.3398867249488835,
+            48.85602050129626
+          ],
+          [
+            2.3400932550430302,
+            48.85609462152885
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Poissy",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 293,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#8e44ad",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.353434562683106,
+            48.85028996920525
+          ],
+          [
+            2.353308498859406,
+            48.85009052711217
+          ],
+          [
+            2.352860968158462,
+            48.849541924033694
+          ],
+          [
+            2.352263134079231,
+            48.848733212016846
+          ],
+          [
+            2.3516653,
+            48.8479245
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Pontoise",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 254,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#2980b9",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3524770140647893,
+            48.85054941923474
+          ],
+          [
+            2.3520725207514284,
+            48.84999532322309
+          ],
+          [
+            2.351486060375714,
+            48.849183011611544
+          ],
+          [
+            2.350983023643494,
+            48.848482606528286
           ]
         ]
       }
@@ -2424,7 +4778,14 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue de Rennes",
-        "color": "#27ae60",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 1233,
+        "anchor_count": 14,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "6e"
       },
       "geometry": {
@@ -2492,32 +4853,127 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Quai de l'Horloge",
-        "color": "#f39c12",
+        "name": "Rue de Rivoli",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 3086,
+        "anchor_count": 27,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "1er"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3413568,
-            48.8571372
+            2.323597669601441,
+            48.86637332881225
           ],
           [
-            2.3427004154038515,
-            48.85699680249374
+            2.324096560478211,
+            48.86629216617396
           ],
           [
-            2.344043704199383,
-            48.8568398832992
+            2.325915098190308,
+            48.86571343745897
           ],
           [
-            2.345348701490937,
-            48.85657376288746
+            2.327036261558533,
+            48.865353493053135
           ],
           [
-            2.3464808,
-            48.8561977
+            2.328312993049622,
+            48.86493708354968
+          ],
+          [
+            2.330083250999451,
+            48.86435128126382
+          ],
+          [
+            2.3318213224411015,
+            48.8638007620223
+          ],
+          [
+            2.333637177944184,
+            48.86322200449507
+          ],
+          [
+            2.3353162407875065,
+            48.86269088270434
+          ],
+          [
+            2.337081134319306,
+            48.86214387430383
+          ],
+          [
+            2.338545620441437,
+            48.86166744276122
+          ],
+          [
+            2.339822351932526,
+            48.86125276717152
+          ],
+          [
+            2.3407343029975896,
+            48.86096337451177
+          ],
+          [
+            2.341750860214234,
+            48.86060868976249
+          ],
+          [
+            2.3431563377380376,
+            48.860158712956114
+          ],
+          [
+            2.3448085784912114,
+            48.85962050009043
+          ],
+          [
+            2.3466056585311894,
+            48.85905757618
+          ],
+          [
+            2.3483303189277653,
+            48.85847346975592
+          ],
+          [
+            2.350113987922669,
+            48.85792288585892
+          ],
+          [
+            2.3515462875366215,
+            48.8574728849071
+          ],
+          [
+            2.3538476228713994,
+            48.85693287842495
+          ],
+          [
+            2.3551404476165776,
+            48.85663993129474
+          ],
+          [
+            2.3566639423370366,
+            48.856269333071424
+          ],
+          [
+            2.358192801475525,
+            48.85589520255827
+          ],
+          [
+            2.3595553636550903,
+            48.855612838055364
+          ],
+          [
+            2.3608911037445073,
+            48.855266939368754
+          ],
+          [
+            2.3619854450225835,
+            48.854959864042286
           ]
         ]
       }
@@ -2525,36 +4981,25 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Quai des Orfèvres",
-        "color": "#9b59b6",
-        "arrondissement": "1er"
+        "name": "Rue de Savoie",
+        "line_color": "#2ecc71",
+        "color": "#2ecc71",
+        "arrondissement": "6e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.341281,
-            48.8568615
+            2.342189,
+            48.8542389
           ],
           [
-            2.341978936457506,
-            48.85625478329137
+            2.3407469,
+            48.8543864
           ],
           [
-            2.3427930336500493,
-            48.85553239594167
-          ],
-          [
-            2.343695206725085,
-            48.85486215369569
-          ],
-          [
-            2.344837372355235,
-            48.85436839863144
-          ],
-          [
-            2.3449201,
-            48.8543358
+            2.3406971,
+            48.8543915
           ]
         ]
       }
@@ -2562,28 +5007,275 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Rue de Harlay",
-        "color": "#1abc9c",
-        "arrondissement": "1er"
+        "name": "Rue de Seine",
+        "line_color": "#8e44ad",
+        "color": "#8e44ad",
+        "arrondissement": "6e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3424924,
-            48.8557924
+            2.3370565,
+            48.8514647
           ],
           [
-            2.3428684296932056,
-            48.85615637243733
+            2.337007,
+            48.852485
           ],
           [
-            2.343185609319394,
-            48.856554674004244
+            2.3369521,
+            48.8537824
           ],
           [
-            2.3434783,
-            48.8569221
+            2.3368031,
+            48.8550692
+          ],
+          [
+            2.336625,
+            48.8562293
+          ],
+          [
+            2.3364895,
+            48.8572568
+          ],
+          [
+            2.3360807,
+            48.857598
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Abbaye",
+        "line_color": "#3498db",
+        "color": "#3498db",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3360616,
+            48.8539523
+          ],
+          [
+            2.3355075,
+            48.8540461
+          ],
+          [
+            2.3337259,
+            48.8544751
+          ],
+          [
+            2.3336373,
+            48.8544959
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Ancienne Comédie",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 93,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#16a085",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.338451743125916,
+            48.8535074075197
+          ],
+          [
+            2.338749468326569,
+            48.852778516131565
+          ],
+          [
+            2.338770925998688,
+            48.85269380167413
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Hôtel Colbert",
+        "color": "#e74c3c",
+        "arrondissement": "5e",
+        "line_color": "#e74c3c"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.349915504455567,
+            48.852058438674376
+          ],
+          [
+            2.3494058847427373,
+            48.85225963783003
+          ],
+          [
+            2.348960638046265,
+            48.85248907447689
+          ],
+          [
+            2.3489713668823247,
+            48.851832529886956
+          ],
+          [
+            2.3486065864562993,
+            48.85164897824658
+          ],
+          [
+            2.3481506109237675,
+            48.85143895198643
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Échaudé",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 190,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.335600554943085,
+            48.85336974845777
+          ],
+          [
+            2.3361450433731084,
+            48.854077453195735
+          ],
+          [
+            2.3366412520408635,
+            48.85482220897414
+          ],
+          [
+            2.336708307266236,
+            48.8549192734846
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Éperon",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 129,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#e67e22",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3405212,
+            48.852155
+          ],
+          [
+            2.340694069862366,
+            48.852900292912985
+          ],
+          [
+            2.340744591716027,
+            48.853041098607136
+          ],
+          [
+            2.340897917747498,
+            48.85328327013555
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bièvre",
+        "line_color": "#27ae60",
+        "color": "#27ae60",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3494465,
+            48.8498773
+          ],
+          [
+            2.3505211,
+            48.850852
+          ],
+          [
+            2.3508616,
+            48.8512566
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bûcherie",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 238,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.349134981632233,
+            48.85143365719537
+          ],
+          [
+            2.349038422107697,
+            48.85145836621551
+          ],
+          [
+            2.347909212112427,
+            48.85229140604385
+          ],
+          [
+            2.3467178,
+            48.8528336
           ]
         ]
       }
@@ -2592,15 +5284,22 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue de la Cité",
-        "color": "#e67e22",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 224,
+        "anchor_count": 7,
+        "buffer_width_m": 12,
+        "line_color": "#e67e22",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "4e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3470489,
-            48.8534759
+            2.3471501469612126,
+            48.85367683353783
           ],
           [
             2.34728623638932,
@@ -2619,322 +5318,12 @@ function getEmbeddedGeoJSON() {
             48.855154639385766
           ],
           [
-            2.348283597225539,
-            48.85557218642024
+            2.348166704177857,
+            48.85539223967926
           ],
           [
-            2.3483752,
-            48.8557133
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue d'Arcole",
-        "color": "#16a085",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3491944,
-            48.8536115
-          ],
-          [
-            2.349487208641471,
-            48.85401779532869
-          ],
-          [
-            2.349782034320006,
-            48.85442345854254
-          ],
-          [
-            2.350081921766454,
-            48.85482750597587
-          ],
-          [
-            2.3502619,
-            48.8550649
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue des Ursins",
-        "color": "#c0392b",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3505464,
-            48.8546829
-          ],
-          [
-            2.351044759158996,
-            48.8543760890208
-          ],
-          [
-            2.3514976637385754,
-            48.85404010412249
-          ],
-          [
-            2.3516816,
-            48.853826
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Massillon",
-        "color": "#2980b9",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3505561,
-            48.85315
-          ],
-          [
-            2.3508511628032553,
-            48.85355558769604
-          ],
-          [
-            2.3509197,
-            48.85365
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue du Cloître Notre-Dame",
-        "color": "#27ae60",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3491944,
-            48.8536115
-          ],
-          [
-            2.349783654264597,
-            48.85339321760969
-          ],
-          [
-            2.350400095932714,
-            48.853199120520195
-          ],
-          [
-            2.3505561,
-            48.85315
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de l'Archevêché",
-        "color": "#d35400",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3517222,
-            48.8517978
-          ],
-          [
-            2.35198333676471,
-            48.852213333725395
-          ],
-          [
-            2.352205044793799,
-            48.85263676099387
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai aux Fleurs",
-        "color": "#8e44ad",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3502619,
-            48.8550649
-          ],
-          [
-            2.3512954955570393,
-            48.85448215906825
-          ],
-          [
-            2.351952461142323,
-            48.853698281891575
-          ],
-          [
-            2.352168938118373,
-            48.852812199537794
-          ],
-          [
-            2.3522069,
-            48.8526464
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Boulevard du Palais",
-        "color": "#f1c40f",
-        "arrondissement": "1er"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3447702,
-            48.8543023
-          ],
-          [
-            2.345537197180988,
-            48.855046616657425
-          ],
-          [
-            2.346178674530544,
-            48.85583891841001
-          ],
-          [
-            2.3461485126379835,
-            48.8556488664831
-          ],
-          [
-            2.3454634670541266,
-            48.85487234841362
-          ],
-          [
-            2.3448485,
-            48.8542668
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Chanoinesse",
-        "color": "#e74c3c",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3497523,
-            48.8543844
-          ],
-          [
-            2.3503033002511997,
-            48.854125083959275
-          ],
-          [
-            2.3507766499531204,
-            48.85380086083318
-          ],
-          [
-            2.3511936467391275,
-            48.853448892680674
-          ],
-          [
-            2.3512252359175774,
-            48.85301954227076
-          ],
-          [
-            2.3511918,
-            48.8529517
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Pont Neuf",
-        "color": "#3498db",
-        "arrondissement": "1er"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3415203,
-            48.8573177
-          ],
-          [
-            2.3417780407694395,
-            48.85763837535921
-          ],
-          [
-            2.3421003073218127,
-            48.85803490762433
-          ],
-          [
-            2.3424225619564467,
-            48.85843144569252
-          ],
-          [
-            2.3424643,
-            48.8584826
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de la Corse",
-        "color": "#27ae60",
-        "arrondissement": "1er"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3464808,
-            48.8561977
-          ],
-          [
-            2.347732620923424,
-            48.85583659548454
-          ],
-          [
-            2.348984628514263,
-            48.855475951556755
-          ],
-          [
-            2.3502133916341807,
-            48.85508299638518
+            2.348265945911408,
+            48.85555107060804
           ]
         ]
       }
@@ -2943,836 +5332,38 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue de la Colombe",
-        "color": "#e74c3c",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 65,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "4e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3507403,
-            48.8548464
+            2.3506531119346623,
+            48.85477455905468
           ],
           [
-            2.3500601,
-            48.8543128
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Lutèce",
-        "color": "#3498db",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3458262,
-            48.8553533
-          ],
-          [
-            2.3470392079919606,
-            48.85493882942875
-          ],
-          [
-            2.3477572,
-            48.8546935
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Aubé",
-        "color": "#27ae60",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3470453,
-            48.8552505
-          ],
-          [
-            2.3474649,
-            48.8559138
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Promenade Maurice Carême",
-        "color": "#f39c12",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3473584,
-            48.8533152
-          ],
-          [
-            2.348519001705999,
-            48.852840240539386
-          ],
-          [
-            2.3496796034119973,
-            48.85236528107878
-          ],
-          [
-            2.3509505981759853,
-            48.85203711315585
-          ],
-          [
-            2.3515753,
-            48.8518811
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Pont de l'Archevêché",
-        "color": "#9b59b6",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3513306,
-            48.8511676
-          ],
-          [
-            2.3517222,
-            48.8517978
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Pont au Double",
-        "color": "#1abc9c",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3482798,
-            48.8523914
-          ],
-          [
-            2.3485529,
-            48.8527643
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Port de Montebello",
-        "color": "#e67e22",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3470228,
-            48.8531209
-          ],
-          [
-            2.34813078116664,
-            48.85259433822765
-          ],
-          [
-            2.3492716367656703,
-            48.8521027648882
-          ],
-          [
-            2.3504825804258433,
-            48.8516857866443
-          ],
-          [
-            2.3513044,
-            48.8514028
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Pont Saint-Louis",
-        "color": "#16a085",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3522069,
-            48.8526464
-          ],
-          [
-            2.3532251,
-            48.8528679
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de Montebello",
-        "color": "#c0392b",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.350421,
-            48.8514761
-          ],
-          [
-            2.3500882917825416,
-            48.851615061414456
-          ],
-          [
-            2.3489343832271388,
-            48.852097011533495
-          ],
-          [
-            2.3477804746717355,
-            48.85257896165254
-          ],
-          [
-            2.3467429,
-            48.8531623
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de la Huchette",
-        "color": "#2980b9",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.346605465402849,
-            48.852765622209866
-          ],
-          [
-            2.3453253327014245,
-            48.85308071110494
-          ],
-          [
-            2.3440452,
-            48.8533958
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Promenade René Capitant",
-        "color": "#8e44ad",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3442301,
-            48.8539492
-          ],
-          [
-            2.3454761398686497,
-            48.85357963118731
-          ],
-          [
-            2.3467221797373,
-            48.85321006237462
-          ],
-          [
-            2.3470228,
-            48.8531209
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai Saint-Michel",
-        "color": "#d35400",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3443857,
-            48.8538084
-          ],
-          [
-            2.3456518199756933,
-            48.85346966703259
-          ],
-          [
-            2.3468007,
-            48.8531623
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Xavier Privas",
-        "color": "#f1c40f",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.345854337570636,
-            48.853253645609676
-          ],
-          [
-            2.3451271,
-            48.8524922
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue des Grands Degrés",
-        "color": "#2ecc71",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3502166,
-            48.8512351
-          ],
-          [
-            2.3493991,
-            48.8514072
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Lagrange",
-        "color": "#1abc9c",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3482382,
-            48.8523487
-          ],
-          [
-            2.347767603423881,
-            48.85158992313987
-          ],
-          [
-            2.3483861017119407,
-            48.850787961569935
-          ],
-          [
-            2.3490046,
-            48.849986
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Hôtel Colbert",
-        "color": "#e74c3c",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3492382,
-            48.8519724
-          ],
-          [
-            2.349052299016568,
-            48.85188131272304
-          ],
-          [
-            2.3479561,
-            48.8513442
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue du Haut Pavé",
-        "color": "#3498db",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3493727,
-            48.8514629
-          ],
-          [
-            2.3495522,
-            48.8517753
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Frédéric Sauton",
-        "color": "#27ae60",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3487708,
-            48.8504073
-          ],
-          [
-            2.349248624978495,
-            48.85124986760273
-          ],
-          [
-            2.3493218,
-            48.8513789
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue des Trois Portes",
-        "color": "#f39c12",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3481229,
-            48.8513912
-          ],
-          [
-            2.3490314,
-            48.8508714
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Maître Albert",
-        "color": "#9b59b6",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.350421,
-            48.8514343
-          ],
-          [
-            2.3498618173322785,
-            48.85084391529001
-          ],
-          [
-            2.3488497,
-            48.8504117
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de la Bièvre 1",
-        "color": "#1abc9c",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3204482,
-            48.800275
-          ],
-          [
-            2.321811495688526,
-            48.80022596935462
-          ],
-          [
-            2.3219024,
-            48.8002227
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de la Bièvre 2",
-        "color": "#e67e22",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.32249,
-            48.8017775
-          ],
-          [
-            2.3225192,
-            48.8018562
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de la Bièvre 3",
-        "color": "#16a085",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3523578,
-            48.8137995
-          ],
-          [
-            2.3533558170977686,
-            48.81329024641467
-          ],
-          [
-            2.3537257,
-            48.8131258
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue des Bernardins",
-        "color": "#c0392b",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3513069,
-            48.851112
-          ],
-          [
-            2.350957708054449,
-            48.85056698421263
-          ],
-          [
-            2.3504267692812397,
-            48.84973829953873
-          ],
-          [
-            2.3498007387327755,
-            48.8489392622457
-          ],
-          [
-            2.3491626,
-            48.848144
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Pontoise",
-        "color": "#2980b9",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3526134,
-            48.8507445
-          ],
-          [
-            2.3520725207514284,
-            48.84999532322309
-          ],
-          [
-            2.351486060375714,
-            48.849183011611544
-          ],
-          [
-            2.3508996,
-            48.8483707
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Poissy",
-        "color": "#8e44ad",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3535052,
-            48.8504134
-          ],
-          [
-            2.3534588022376934,
-            48.85035063605054
-          ],
-          [
-            2.352860968158462,
-            48.849541924033694
-          ],
-          [
-            2.352263134079231,
-            48.848733212016846
-          ],
-          [
-            2.3516653,
-            48.8479245
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Port de la Tournelle",
-        "color": "#d35400",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3513044,
-            48.8514028
-          ],
-          [
-            2.352255001298513,
-            48.85103147997776
-          ],
-          [
-            2.3529311501257544,
-            48.850785330935516
-          ],
-          [
-            2.3537974802794097,
-            48.85058577390645
-          ],
-          [
-            2.3548708122546067,
-            48.850449492804195
-          ],
-          [
-            2.355839094634172,
-            48.8499733198344
-          ],
-          [
-            2.3569929577013116,
-            48.84959455621478
-          ],
-          [
-            2.358051285449976,
-            48.84932378389477
-          ],
-          [
-            2.3589543,
-            48.8489748
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de la Tournelle",
-        "color": "#f1c40f",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3504558,
-            48.8514761
-          ],
-          [
-            2.351627210675599,
-            48.851012812610016
-          ],
-          [
-            2.3528652181712886,
-            48.850632555275965
-          ],
-          [
-            2.35410728432867,
-            48.85025735810705
-          ],
-          [
-            2.3553493504860517,
-            48.84988216093814
-          ],
-          [
-            2.356591416643433,
-            48.84950696376923
-          ],
-          [
-            2.3568366,
-            48.8494329
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Boulevard Saint-Michel 1",
-        "color": "#2ecc71",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3391186,
-            48.8442974
-          ],
-          [
-            2.338677172538346,
-            48.843473587956375
-          ],
-          [
-            2.338222715025564,
-            48.84262545863758
-          ],
-          [
-            2.337768257512782,
-            48.84177732931879
-          ],
-          [
-            2.3373138,
-            48.8409292
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Boulevard Saint-Michel 2",
-        "color": "#1abc9c",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3441309,
-            48.8533927
-          ],
-          [
-            2.3437188453863578,
-            48.85255421303381
-          ],
-          [
-            2.343298333723529,
-            48.85169851687913
-          ],
-          [
-            2.342877822060701,
-            48.850842820724445
-          ],
-          [
-            2.342455068170871,
-            48.84998767356868
-          ],
-          [
-            2.3419234932814446,
-            48.84915917073134
-          ],
-          [
-            2.341391918392018,
-            48.84833066789401
+            2.3505726456642155,
+            48.85470837853573
           ],
           [
-            2.340860343502592,
-            48.847502165056675
+            2.3504640161991124,
+            48.85462543216177
           ],
           [
-            2.340468924109735,
-            48.846645571956486
+            2.350282967090607,
+            48.85452042538486
           ],
           [
-            2.3400044,
-            48.8457998
+            2.3500791192054753,
+            48.85432982428592
           ]
         ]
       }
@@ -3781,27 +5372,38 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue de la Harpe",
-        "color": "#e74c3c",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 208,
+        "anchor_count": 5,
+        "buffer_width_m": 12,
+        "line_color": "#80c7d0",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
         "arrondissement": "5e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3445887,
-            48.8532442
+            2.34459400177002,
+            48.8531261968825
           ],
           [
-            2.344630286774112,
-            48.85293101320923
+            2.34459400177002,
+            48.85283852211883
+          ],
+          [
+            2.344695925712586,
+            48.85247142554141
           ],
           [
             2.34433864633987,
             48.852104699645174
           ],
           [
-            2.3435767,
-            48.8513581
+            2.3436552286148076,
+            48.851476015508126
           ]
         ]
       }
@@ -3809,49 +5411,35 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Rue Saint-Séverin",
-        "color": "#3498db",
+        "name": "Rue de la Huchette",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 138,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "5e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3438219,
-            48.8527586
+            2.3464822769165044,
+            48.852785575663205
           ],
           [
-            2.345107679074711,
-            48.852453656019165
+            2.3460316658020024,
+            48.85289852803421
           ],
           [
-            2.3462784,
-            48.852176
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue du Petit Pont",
-        "color": "#27ae60",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3463622,
-            48.8521797
+            2.3453253327014245,
+            48.85308071110494
           ],
           [
-            2.346877193079788,
-            48.8530031053186
-          ],
-          [
-            2.3469399,
-            48.8530656
+            2.344717383384705,
+            48.85323032415026
           ]
         ]
       }
@@ -3860,7 +5448,14 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue de la Parcheminerie",
-        "color": "#f39c12",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 133,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
         "arrondissement": "5e"
       },
       "geometry": {
@@ -3884,1088 +5479,35 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Rue Boutebrie",
-        "color": "#9b59b6",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3444781,
-            48.8510869
-          ],
-          [
-            2.3448364,
-            48.8517206
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Dante",
-        "color": "#1abc9c",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3455155,
-            48.8508423
-          ],
-          [
-            2.3467051912282413,
-            48.85128495673048
-          ],
-          [
-            2.347256,
-            48.8514899
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Galande",
-        "color": "#e67e22",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3479806,
-            48.8513149
-          ],
-          [
-            2.34721313370562,
-            48.85150166424673
-          ],
-          [
-            2.3463478,
-            48.852176
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Domat",
-        "color": "#16a085",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.347547,
-            48.8506747
-          ],
-          [
-            2.3474474110310783,
-            48.85070385357564
-          ],
-          [
-            2.3461987,
-            48.8510694
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
         "name": "Rue des Anglais",
-        "color": "#c0392b",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 73,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
         "arrondissement": "5e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3481388,
-            48.8510412
+            2.347984313964844,
+            48.85099418758604
           ],
           [
-            2.3473064,
-            48.8504099
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de la Bûcherie",
-        "color": "#2980b9",
-        "arrondissement": "5e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3493417,
-            48.8514173
-          ],
-          [
-            2.3487680924701424,
-            48.85167206688673
-          ],
-          [
-            2.3478392166268796,
-            48.85231950387564
-          ],
-          [
-            2.3467178,
-            48.8528336
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Serpente 1",
-        "color": "#8e44ad",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3405938,
-            48.852497
-          ],
-          [
-            2.340980713380343,
-            48.85245847772524
-          ],
-          [
-            2.3421294300706417,
-            48.85229310774052
-          ],
-          [
-            2.3433269,
-            48.8518596
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Serpente 2",
-        "color": "#d35400",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.2468969,
-            48.9171668
-          ],
-          [
-            2.2463498322372297,
-            48.91764084261361
-          ],
-          [
-            2.2456326,
-            48.9170199
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai des Grands Augustins",
-        "color": "#f1c40f",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3443857,
-            48.8538084
-          ],
-          [
-            2.3433101911751772,
-            48.85423728127996
-          ],
-          [
-            2.3422736303906646,
-            48.85481775206455
-          ],
-          [
-            2.3413680651953324,
-            48.855491376032276
-          ],
-          [
-            2.3404625,
-            48.856165
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Savoie 1",
-        "color": "#2ecc71",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.4815085,
-            48.8102444
-          ],
-          [
-            2.4819875,
-            48.8110119
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Savoie 2",
-        "color": "#1abc9c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.4575228,
-            48.9121792
-          ],
-          [
-            2.4565329421192037,
-            48.912800143000055
-          ],
-          [
-            2.4557311,
-            48.9130362
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Séguier",
-        "color": "#e74c3c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3415258,
-            48.8534034
-          ],
-          [
-            2.3421823102240533,
-            48.85419218439654
-          ],
-          [
-            2.3425388,
-            48.8546205
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Gît-le-Cœur",
-        "color": "#3498db",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.34232,
-            48.8533454
-          ],
-          [
-            2.3430218406884076,
-            48.854117100206636
-          ],
-          [
-            2.343185,
-            48.8542965
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Saint-André des Arts",
-        "color": "#27ae60",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3431937,
-            48.8531991
-          ],
-          [
-            2.342442367029873,
-            48.85327182678126
-          ],
-          [
-            2.3410901446865817,
-            48.85340271785417
-          ],
-          [
-            2.339737922343291,
-            48.85353360892709
-          ],
-          [
-            2.3383857,
-            48.8536645
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Suger",
-        "color": "#f39c12",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3427976,
-            48.8530034
-          ],
-          [
-            2.342066907864028,
-            48.85297574446049
-          ],
-          [
-            2.3407024,
-            48.8529241
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Danton 1",
-        "color": "#9b59b6",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.2007826,
-            48.876395
-          ],
-          [
-            2.200093981974922,
-            48.87671516236896
-          ],
-          [
-            2.1989774,
-            48.8772343
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Danton 2",
-        "color": "#1abc9c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.4466933,
-            48.8660641
-          ],
-          [
-            2.4479467378296778,
-            48.86570505822741
-          ],
-          [
-            2.4492609851806373,
-            48.86545777762136
-          ],
-          [
-            2.45059276172926,
-            48.86528319641896
-          ],
-          [
-            2.4519261816222064,
-            48.86512978585987
-          ],
-          [
-            2.4532279120165517,
-            48.86485503220415
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Éperon",
-        "color": "#e67e22",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3405212,
-            48.852155
-          ],
-          [
-            2.340744591716027,
-            48.853041098607136
-          ],
-          [
-            2.3409582,
-            48.8533828
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Ancienne Comédie",
-        "color": "#16a085",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3384148,
-            48.8536645
-          ],
-          [
-            2.3385326236811173,
-            48.853354739363525
-          ],
-          [
-            2.3387535,
-            48.8524745
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Christine",
-        "color": "#c0392b",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3405894,
-            48.8542874
-          ],
-          [
-            2.3393745,
-            48.8546974
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Dauphine",
-        "color": "#2980b9",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3383857,
-            48.8536645
-          ],
-          [
-            2.33906005872162,
-            48.854446742276984
-          ],
-          [
-            2.33973441744324,
-            48.85522898455397
-          ],
-          [
-            2.340366028923121,
-            48.85602191314615
-          ],
-          [
-            2.3404015,
-            48.8561313
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Nevers",
-        "color": "#8e44ad",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3386577,
-            48.8553621
-          ],
-          [
-            2.33971498153031,
-            48.855932060431606
-          ],
-          [
-            2.3404015,
-            48.8561313
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Guénégaud",
-        "color": "#d35400",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3395288,
-            48.8562267
-          ],
-          [
-            2.3399774,
-            48.8564593
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de Conti",
-        "color": "#f1c40f",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3404625,
-            48.856165
-          ],
-          [
-            2.340303858598938,
-            48.8562576943336
-          ],
-          [
-            2.339281835525124,
-            48.8568548634655
-          ],
-          [
-            2.338374336483158,
-            48.85702893833912
-          ],
-          [
-            2.3375704277204115,
-            48.85765420521501
-          ],
-          [
-            2.3362748,
-            48.8579408
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Passage Dauphine",
-        "color": "#2ecc71",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3380189,
-            48.854775
-          ],
-          [
-            2.3393094660168483,
-            48.854700010523636
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Buci",
-        "color": "#1abc9c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3358949,
-            48.8531684
-          ],
-          [
-            2.336842689114231,
-            48.8537987401462
-          ],
-          [
-            2.3381623625650167,
-            48.85369342858649
-          ],
-          [
-            2.3383857,
-            48.8536645
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Échaudé",
-        "color": "#e74c3c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3355212,
-            48.8532648
-          ],
-          [
-            2.3360999917830325,
-            48.85407950621211
-          ],
-          [
-            2.3366787835660645,
-            48.85489421242422
-          ],
-          [
-            2.3368031,
-            48.8550692
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Cardinale",
-        "color": "#3498db",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3359268,
-            48.8539972
-          ],
-          [
-            2.3358743,
-            48.8544841
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Abbaye 1",
-        "color": "#27ae60",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.2301652,
-            48.8160328
-          ],
-          [
-            2.229228186817984,
-            48.81574560494279
-          ],
-          [
-            2.22799,
-            48.8153661
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de l'Abbaye 2",
-        "color": "#f39c12",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.4745983,
-            48.8135017
-          ],
-          [
-            2.475009639087389,
-            48.814359260207425
-          ],
-          [
-            2.475149,
-            48.8146498
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue du Jardinet",
-        "color": "#9b59b6",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3397002,
-            48.8528777
-          ],
-          [
-            2.3405635,
-            48.8523541
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Cour de Rohan 1",
-        "color": "#1abc9c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3391414,
-            48.8530827
-          ],
-          [
-            2.3395574,
-            48.8529765
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Cour de Rohan 2",
-        "color": "#e67e22",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3594676,
-            48.8596398
-          ],
-          [
-            2.3599422,
-            48.8595983
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Mignon",
-        "color": "#16a085",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3414433,
-            48.8518287
-          ],
-          [
-            2.3417861,
-            48.8524174
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Hautefeuille",
-        "color": "#c0392b",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3432362,
-            48.8528759
-          ],
-          [
-            2.3428523251159743,
-            48.852371056690586
-          ],
-          [
-            2.3420334080689993,
-            48.85166048546434
-          ],
-          [
-            2.3413187,
-            48.8508967
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Mazarine",
-        "color": "#2980b9",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3383857,
-            48.8536645
-          ],
-          [
-            2.3380358763794407,
-            48.854533868019786
-          ],
-          [
-            2.337686052758882,
-            48.855403236039564
-          ],
-          [
-            2.3373362291383226,
-            48.85627260405935
-          ],
-          [
-            2.3368489675891877,
-            48.85705952789877
-          ],
-          [
-            2.3365864,
-            48.8571228
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Seine 1",
-        "color": "#8e44ad",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.227751,
-            48.9214259
-          ],
-          [
-            2.2273033582103365,
-            48.921015962703464
-          ],
-          [
-            2.2267384,
-            48.9205867
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Seine 2",
-        "color": "#d35400",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.2274672,
-            48.9198284
-          ],
-          [
-            2.2274159,
-            48.9199155
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Seine 3",
-        "color": "#f1c40f",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3365215,
-            48.8570788
-          ],
-          [
-            2.3360807,
-            48.857598
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue de Seine 4",
-        "color": "#2ecc71",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.419219,
-            48.8105617
-          ],
-          [
-            2.4205581950429567,
-            48.810737728799054
-          ],
-          [
-            2.4209901,
-            48.8107945
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Bonaparte",
-        "color": "#1abc9c",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3353448,
-            48.8577271
-          ],
-          [
-            2.335222200791762,
-            48.85753266713459
-          ],
-          [
-            2.3346984217300726,
-            48.85670199403916
-          ],
-          [
-            2.334174642668384,
-            48.855871320943734
-          ],
-          [
-            2.333779853537194,
-            48.85501320698373
-          ],
-          [
-            2.333465286649063,
-            48.854138026825595
-          ],
-          [
-            2.333314121493422,
-            48.85325464414414
-          ],
-          [
-            2.333134764931159,
-            48.85236309991374
-          ],
-          [
-            2.332955408368896,
-            48.85147155568333
-          ],
-          [
-            2.3327760518066336,
-            48.85058001145293
+            2.3476302623748784,
+            48.8507153253516
           ],
           [
-            2.3327217426264735,
-            48.8496842429036
+            2.3475337028503422,
+            48.850623547567665
           ],
           [
-            2.3327614,
-            48.8487853
+            2.347370088100434,
+            48.850480585684465
           ]
         ]
       }
@@ -4974,23 +5516,30 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue des Beaux-Arts",
-        "color": "#e74c3c",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 124,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#e74c3c",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
         "arrondissement": "6e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3346703,
-            48.8564779
+            2.3347878456115727,
+            48.85644580875804
           ],
           [
-            2.3360216971281833,
-            48.85634302393382
+            2.335753440856934,
+            48.85637168904543
           ],
           [
-            2.3366181,
-            48.8562835
+            2.336456179618836,
+            48.856279921630176
           ]
         ]
       }
@@ -4998,265 +5547,71 @@ function getEmbeddedGeoJSON() {
     {
       "type": "Feature",
       "properties": {
-        "name": "Rue Visconti",
-        "color": "#3498db",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3364943,
-            48.8556916
-          ],
-          [
-            2.3367144,
-            48.8556694
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Jacob 1",
-        "color": "#27ae60",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3340451,
-            48.8554689
-          ],
-          [
-            2.332873445272934,
-            48.855886635834686
-          ],
-          [
-            2.3316717,
-            48.8563151
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Jacob 2",
-        "color": "#f39c12",
-        "arrondissement": "6e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.336101,
-            48.8547693
-          ],
-          [
-            2.3368794,
-            48.8545063
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai du Louvre",
-        "color": "#9b59b6",
-        "arrondissement": "1er"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3424643,
-            48.8584826
-          ],
-          [
-            2.341159184410777,
-            48.85873561174439
-          ],
-          [
-            2.339848,
-            48.8589898
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de la Mégisserie",
-        "color": "#1abc9c",
-        "arrondissement": "1er"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3424643,
-            48.8584826
-          ],
-          [
-            2.34372973689139,
-            48.85814258558996
-          ],
-          [
-            2.344995173782779,
-            48.85780257117992
-          ],
-          [
-            2.346260610674169,
-            48.85746255676988
-          ],
-          [
-            2.3471157,
-            48.8572328
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de Gesvres",
-        "color": "#e67e22",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3507047,
-            48.8560699
-          ],
-          [
-            2.349592776887797,
-            48.85647832167039
-          ],
-          [
-            2.3483779396411246,
-            48.85688771357007
-          ],
-          [
-            2.3471157,
-            48.8572328
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai de l'Hôtel de Ville",
-        "color": "#16a085",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3507047,
-            48.8560699
-          ],
-          [
-            2.351892985081042,
-            48.855625483781076
-          ],
-          [
-            2.3527928381143948,
-            48.85533910116823
-          ],
-          [
-            2.3538214346682076,
-            48.85486694887991
-          ],
-          [
-            2.355008595358509,
-            48.85442880190267
-          ],
-          [
-            2.356156879848283,
-            48.85395537598723
-          ],
-          [
-            2.3573971957843325,
-            48.853577553709464
-          ],
-          [
-            2.357833,
-            48.8534448
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Allée Célestin Hennion",
-        "color": "#c0392b",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3472914,
-            48.8550911
-          ],
-          [
-            2.3477466,
-            48.8558323
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Quai du Marché Neuf - Maurice Grimaud",
-        "color": "#2980b9",
-        "arrondissement": "4e"
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            2.3449201,
-            48.8543358
-          ],
-          [
-            2.3461428790409555,
-            48.853933985153326
-          ],
-          [
-            2.3471139,
-            48.8536149
-          ]
-        ]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Rue Cochin",
-        "color": "#8e44ad",
+        "name": "Rue des Bernardins",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 350,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
         "arrondissement": "5e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3523394,
-            48.8502644
+            2.3512271046638493,
+            48.850999482423575
           ],
           [
-            2.3532164,
-            48.8499694
+            2.350957708054449,
+            48.85056698421263
+          ],
+          [
+            2.3504267692812397,
+            48.84973829953873
+          ],
+          [
+            2.3498028516769414,
+            48.848899152930315
+          ],
+          [
+            2.3493951559066777,
+            48.84837317427167
+          ],
+          [
+            2.3491698503494267,
+            48.848161369224556
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Grands Degrés",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 45,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#2ecc71",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3500764369964604,
+            48.85126775345876
+          ],
+          [
+            2.3494809865951543,
+            48.851378944321716
           ]
         ]
       }
@@ -5265,19 +5620,222 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Rue des Poitevins",
-        "color": "#d35400",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 45,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#d35400",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
         "arrondissement": "6e"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
           [
-            2.3421619,
-            48.8525796
+            2.34222561120987,
+            48.85254378613744
           ],
           [
-            2.3429064,
-            48.8524198
+            2.342815697193146,
+            48.85242200848887
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Trois Portes",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 66,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#f39c12",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3482739925384526,
+            48.85130658204213
+          ],
+          [
+            2.3489230871200566,
+            48.85089005566754
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Ursins",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 117,
+        "anchor_count": 6,
+        "buffer_width_m": 12,
+        "line_color": "#c0392b",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.350631654262543,
+            48.85463337384183
+          ],
+          [
+            2.3509602248668675,
+            48.85444718523361
+          ],
+          [
+            2.351044759158996,
+            48.8543760890208
+          ],
+          [
+            2.351438999176026,
+            48.854060687239105
+          ],
+          [
+            2.3515704274177556,
+            48.85400421239645
+          ],
+          [
+            2.351685762405396,
+            48.85385684805386
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Cloître Notre-Dame",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 215,
+        "anchor_count": 4,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.349309325218201,
+            48.853544469510155
+          ],
+          [
+            2.349783654264597,
+            48.85339321760969
+          ],
+          [
+            2.350400095932714,
+            48.853199120520195
+          ],
+          [
+            2.3519486188888554,
+            48.85270086121773
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Haut Pavé",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 23,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#3498db",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3493683338165288,
+            48.851490134937734
+          ],
+          [
+            2.3494970798492436,
+            48.85168074684787
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Jardinet",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 72,
+        "anchor_count": 2,
+        "buffer_width_m": 12,
+        "line_color": "#9b59b6",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.303Z",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.339701652526856,
+            48.852875584604455
+          ],
+          [
+            2.3404312133789067,
+            48.85244671702124
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Petit Pont",
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 86,
+        "anchor_count": 3,
+        "buffer_width_m": 12,
+        "line_color": "#27ae60",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3463535308837895,
+            48.85226669743482
+          ],
+          [
+            2.346718311309815,
+            48.85291264706266
+          ],
+          [
+            2.3467773199081425,
+            48.85298677189672
           ]
         ]
       }
@@ -5286,8 +5844,15 @@ function getEmbeddedGeoJSON() {
       "type": "Feature",
       "properties": {
         "name": "Voie Georges-Pompidou",
-        "color": "#f1c40f",
-        "arrondissement": "1er"
+        "city": "Paris",
+        "type": "geofencing-centerline",
+        "total_length_m": 1722,
+        "anchor_count": 19,
+        "buffer_width_m": 12,
+        "line_color": "#f1c40f",
+        "source": "OpenStreetMap / Paris Geofencing Editor",
+        "generated_at": "2026-03-24T14:26:42.302Z",
+        "arrondissement": "8e"
       },
       "geometry": {
         "type": "LineString",
@@ -5373,6 +5938,7 @@ function getEmbeddedGeoJSON() {
     }
   ]
 };
+}
 }
 
 
