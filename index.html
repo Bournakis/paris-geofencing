@@ -179,17 +179,23 @@
     .leaflet-control-zoom a { background: #13162b !important; color: #e2e8f0 !important; border-color: #232645 !important; }
     .leaflet-control-zoom a:hover { background: #1c2040 !important; }
 
-    /* Anchor handles — colour via CSS variable */
+    /* Anchor handles — couleur définie en inline style par rue */
     .anchor-handle {
-      background: #fff;
-      border: 2.5px solid var(--line-color);
       border-radius: 50%;
       cursor: grab !important;
-      box-shadow: 0 1px 5px rgba(0,0,0,.5);
       transition: transform .1s, box-shadow .1s;
+      overflow: visible;
     }
-    .anchor-handle:hover { transform: scale(1.55); box-shadow: 0 2px 10px rgba(231,76,60,.45); }
-    .anchor-handle.endpoint { background: #ffd700; border-color: #e67e22; }
+    .anchor-handle:hover { transform: scale(1.55); }
+    .ah-inner {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      box-shadow: 0 1px 5px rgba(0,0,0,.5);
+      box-sizing: border-box;
+      border-width: 2.5px;
+      border-style: solid;
+    }
+    .anchor-handle:hover .ah-inner { box-shadow: 0 2px 10px rgba(0,0,0,.5); }
 
     .handle-tooltip { background: #13162b !important; border: 1px solid #232645 !important; border-radius: 6px !important; color: #e2e8f0 !important; font-size: 11px !important; padding: 5px 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,.4) !important; }
     .handle-tooltip::before { display: none !important; }
@@ -244,8 +250,28 @@
     .search-status.error { color: #e74c3c; }
     .search-status.ok { color: #2ecc71; }
 
+    /* ── STREET SELECTOR DROPDOWN ── */
+    #street-selector-wrap { padding: 0 14px 8px; }
+    #street-selector {
+      width: 100%; background: #1c2040; border: 1px solid #232645; border-radius: 8px;
+      color: #e2e8f0; font-size: 12px; padding: 7px 10px; outline: none; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236470a8' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+      padding-right: 28px;
+    }
+    #street-selector:hover { border-color: #3d4270; }
+    #street-selector option, #street-selector optgroup { background: #13162b; color: #e2e8f0; }
+    #street-selector optgroup { font-size: 11px; color: #6470a8; font-style: normal; }
+
     /* ── STREET LIST ── */
-    #street-list { padding: 0 14px 6px; }
+    #street-list { padding: 0 14px 6px; overflow-y: auto; max-height: 280px; }
+    .arr-group { margin-bottom: 4px; }
+    .arr-header {
+      font-size: 10px; font-weight: 700; color: #6470a8; text-transform: uppercase;
+      letter-spacing: .06em; padding: 6px 4px 3px; display: flex; align-items: center; gap: 6px;
+    }
+    .arr-header::after { content:''; flex:1; height:1px; background:#232645; }
     .street-list-item {
       display: flex; align-items: center; gap: 8px; padding: 9px 10px;
       background: #1c2040; border: 1px solid #232645; border-radius: 8px;
@@ -292,8 +318,13 @@
       <div id="search-status" class="search-status hidden"></div>
     </div>
 
-    <!-- Street list -->
+    <!-- Street selector dropdown + list -->
     <div class="section-title">Rues</div>
+    <div id="street-selector-wrap">
+      <select id="street-selector" onchange="selectStreetFromDropdown(this.value)" size="1">
+        <option value="">— Sélectionner une rue —</option>
+      </select>
+    </div>
     <div id="street-list">
       <div class="street-list-empty">Aucune rue ajoutée</div>
     </div>
@@ -317,9 +348,9 @@
     </div>
     <div class="slider-row hidden" id="buf-slider-row">
       <span class="slider-label">Largeur</span>
-      <input type="range" id="buf-width" min="1" max="200" value="30" step="1"
+      <input type="range" id="buf-width" min="1" max="200" value="12" step="1"
              oninput="updateBufWidth(this.value)">
-      <span class="slider-val" id="buf-width-val">30 m</span>
+      <span class="slider-val" id="buf-width-val">12 m</span>
     </div>
 
     <!-- Numbers toggle -->
@@ -406,7 +437,7 @@
 let map;
 let showBuf     = false;
 let showNums    = false;
-let bufferWidth = 30;
+let bufferWidth = 12;
 let ctxState    = { mode: null, idx: -1, latlng: null };
 
 // Server base URL — fonctionne en file:// ET en http://
@@ -636,32 +667,131 @@ function resample(path, interval=100) {
 const PARIS_BBOX = '48.81,2.22,48.91,2.47'; // Grand Paris
 
 /**
- * Charge la géométrie d'une rue depuis Overpass et retourne les ancres.
- * Renvoie un tableau de {lat, lon} ou lève une erreur.
+ * Détecte les tronçons disjoints dans une liste de points dédoublonnés.
+ * Un saut > 150m indique deux tronçons séparés.
+ * Renvoie un tableau de tableaux de points.
+ */
+function detectSegments(deduped) {
+  if (!deduped.length) return [];
+  const segs = [[deduped[0]]];
+  for (let i = 1; i < deduped.length; i++) {
+    const d = haversine(deduped[i-1].lat, deduped[i-1].lon, deduped[i].lat, deduped[i].lon);
+    if (d > 150) segs.push([]);  // gap → nouveau tronçon
+    segs[segs.length-1].push(deduped[i]);
+  }
+  return segs.filter(s => s.length >= 2);
+}
+
+/**
+ * Essaie de corriger le sens d'une rue via les numéros d'adresse OSM.
+ * Le n°1 (ou le plus petit numéro) doit être au début du tracé.
+ */
+async function fixDirectionByHousenumber(anchors, streetName) {
+  try {
+    const q = `[out:json][timeout:20];
+node["addr:street"="${streetName.replace(/"/g,'\\"')}"]["addr:housenumber"](${PARIS_BBOX});
+out;`;
+    const r = await fetch('https://overpass-api.de/api/interpreter', {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'data='+encodeURIComponent(q)
+    });
+    if (!r.ok) return anchors;
+    const data = await r.json();
+    const nodes = data.elements || [];
+    if (!nodes.length) return anchors;
+
+    // Trouver le nœud avec le plus petit numéro de rue
+    let minNum = 99999, minNode = null;
+    for (const n of nodes) {
+      const raw = n.tags?.['addr:housenumber'] || '';
+      const m = raw.match(/^(\d+)/);
+      if (m) {
+        const num = parseInt(m[1]);
+        if (num < minNum) { minNum = num; minNode = n; }
+      }
+    }
+    if (!minNode) return anchors;
+
+    const start = anchors[0], end = anchors[anchors.length-1];
+    const dStart = Math.hypot(minNode.lat - start.lat, minNode.lon - start.lon);
+    const dEnd   = Math.hypot(minNode.lat - end.lat,   minNode.lon - end.lon);
+
+    if (dEnd < dStart) {
+      console.log(`↩ ${streetName} : inversé (n°${minNum} était côté fin)`);
+      return [...anchors].reverse();
+    }
+    return anchors;
+  } catch(e) {
+    console.warn('fixDirection error:', e);
+    return anchors;
+  }
+}
+
+/**
+ * Charge la géométrie d'une rue depuis Overpass.
+ * Renvoie un objet { segments: [{name, anchors}, ...] }.
+ * Un seul segment dans 99% des cas ; deux si la rue est divisée.
  */
 async function fetchStreetGeometry(streetName) {
-  const query = `[out:json][timeout:60];
+  // Requête 1 : ways "highway"
+  let query = `[out:json][timeout:60];
 (
   way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"](${PARIS_BBOX});
 );
 out geom;`;
-
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+  let res = await fetch('https://overpass-api.de/api/interpreter', {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:'data='+encodeURIComponent(query)
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
+  let json = await res.json();
+  let allWays = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
 
-  const allWays = json.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
+  // Fallback : promenades, footways, etc. sans "highway"
+  if (!allWays.length) {
+    const q2 = `[out:json][timeout:60];
+(
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["highway"~"."](${PARIS_BBOX});
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["leisure"~"."](${PARIS_BBOX});
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["tourism"~"."](${PARIS_BBOX});
+  way["name"="${streetName.replace(/"/g,'\\"')}"]["waterway"~"."](${PARIS_BBOX});
+);
+out geom;`;
+    const r2 = await fetch('https://overpass-api.de/api/interpreter', {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'data='+encodeURIComponent(q2)
+    });
+    if (r2.ok) {
+      const j2 = await r2.json();
+      allWays = j2.elements.filter(e=>e.type==='way' && e.geometry?.length>=2);
+    }
+  }
+
   if (!allWays.length) throw new Error(`Aucun segment OSM trouvé pour « ${streetName} »`);
 
-  // cleanMerge auto-détecte l'axe principal
-  const cleaned = cleanMerge(allWays);
-  const simplified = douglasPeucker(cleaned, 0.00007);
-  const anchors = resample(simplified, 100);
-  return anchors;
+  // Merge + simplify
+  const cleaned   = cleanMerge(allWays);
+  const rawSegs   = detectSegments(cleaned);
+  if (!rawSegs.length) throw new Error(`Géométrie vide pour « ${streetName} »`);
+
+  // Build each segment
+  const isSplit = rawSegs.length > 1;
+  if (isSplit) {
+    console.log(`⚡ ${streetName} : ${rawSegs.length} tronçons détectés`);
+  }
+
+  const segments = [];
+  for (let i = 0; i < rawSegs.length; i++) {
+    const simplified = douglasPeucker(rawSegs[i], 0.00007);
+    let anchors = resample(simplified, 100);
+    // Correction du sens via numéros de maison
+    anchors = await fixDirectionByHousenumber(anchors, streetName);
+    await new Promise(r => setTimeout(r, 500)); // petit délai entre requêtes
+    const segName = isSplit ? `${streetName} ${i+1}` : streetName;
+    segments.push({ name: segName, anchors });
+  }
+
+  return segments;  // array de { name, anchors }
 }
 
 // ═══════════════════════════════════════════════════
@@ -879,14 +1009,15 @@ async function addStreet() {
     }
 
     // ── ÉTAPE 2 : charger la géométrie ──────────────────
-    const color = STREET_COLORS[streets.length % STREET_COLORS.length];
-    const id = ++streetIdCounter;
-    const street = {
-      id, name: officialName, markers: [], polyline: null, hitPolyline: null,
-      bufferLayer: null, origPts: null, color, loading: true
+    // Placeholder "loading" pour feedback visuel immédiat
+    const placeholderId = ++streetIdCounter;
+    const placeholder = {
+      id: placeholderId, name: officialName, markers: [], polyline: null, hitPolyline: null,
+      bufferLayer: null, origPts: null, color: STREET_COLORS[streets.length % STREET_COLORS.length],
+      loading: true, arrondissement: null
     };
-    streets.push(street);
-    activeStreetId = id;
+    streets.push(placeholder);
+    activeStreetId = placeholderId;
     renderStreetList();
 
     document.getElementById('loading').classList.remove('hidden');
@@ -894,26 +1025,59 @@ async function addStreet() {
     statusEl.className = 'search-status';
     statusEl.textContent = `Chargement de « ${officialName} »…`;
 
-    let anchors;
+    let segments;
     try {
-      anchors = await fetchStreetGeometry(officialName);
+      segments = await fetchStreetGeometry(officialName);
     } catch(e) {
       // Retry une fois après un délai (Overpass rate-limit ou timeout)
       console.warn('First fetch failed, retrying in 5s…', e.message);
       statusEl.textContent = `Serveur occupé — nouvelle tentative dans 5s…`;
       await new Promise(r => setTimeout(r, 5000));
-      anchors = await fetchStreetGeometry(officialName);
+      segments = await fetchStreetGeometry(officialName);
     }
 
-    street.loading = false;
-    street.origPts = anchors.map(p=>({...p}));
-    buildLineForStreet(street, anchors);
+    // Retirer le placeholder
+    placeholder.markers.forEach(m=>m.remove());
+    if (placeholder.polyline) placeholder.polyline.remove();
+    if (placeholder.hitPolyline) placeholder.hitPolyline.remove();
+    streets = streets.filter(s => s.id !== placeholderId);
+
+    // Créer une entrée par segment (1 dans 99% des cas, 2 si rue divisée)
+    const isSplit = segments.length > 1;
+    let lastId = null;
+    for (let si = 0; si < segments.length; si++) {
+      const { name: segName, anchors } = segments[si];
+      // Vérifier doublon pour chaque tronçon
+      if (streets.find(s => s.name.toLowerCase() === segName.toLowerCase())) {
+        statusEl.textContent = `⚠ « ${segName} » déjà ajouté.`;
+        continue;
+      }
+      const color = STREET_COLORS[streets.length % STREET_COLORS.length];
+      const id = ++streetIdCounter;
+      const s = {
+        id, name: segName, markers: [], polyline: null, hitPolyline: null,
+        bufferLayer: null, origPts: anchors.map(p=>({...p})), color, loading: false, arrondissement: null
+      };
+      streets.push(s);
+      activeStreetId = id;
+      lastId = id;
+      buildLineForStreet(s, anchors);
+
+      // Arrondissement async
+      const mid = anchors[Math.floor(anchors.length/2)];
+      fetchArrondissement(mid.lat, mid.lon).then(arr => {
+        s.arrondissement = arr;
+        renderStreetList();
+      });
+    }
 
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('street-input').value = '';
     hideSuggestions();
     statusEl.className = 'search-status ok';
-    statusEl.textContent = `✓ « ${officialName} » — ${anchors.length} poignées`;
+    const totalPts = segments.reduce((n, sg) => n + sg.anchors.length, 0);
+    const splitMsg = isSplit ? ` (${segments.length} tronçons)` : '';
+    statusEl.textContent = `✓ « ${officialName} » — ${totalPts} poignées${splitMsg}`;
     setTimeout(() => { statusEl.className = 'search-status hidden'; }, 5000);
 
     renderStreetList();
@@ -924,17 +1088,15 @@ async function addStreet() {
 
   } catch(err) {
     console.warn('addStreet failed:', err);
-    // Clean up failed street entry if it was added
-    const failedIdx = streets.findIndex(s => s.loading);
-    if (failedIdx >= 0) {
-      const s = streets[failedIdx];
+    // Nettoyer les entrées loading échouées
+    streets.filter(s => s.loading).forEach(s => {
       s.markers.forEach(m => m.remove());
       if (s.polyline) s.polyline.remove();
       if (s.hitPolyline) s.hitPolyline.remove();
-      streets.splice(failedIdx, 1);
-      activeStreetId = streets.length ? streets[streets.length-1].id : null;
-      renderStreetList();
-    }
+    });
+    streets = streets.filter(s => !s.loading);
+    activeStreetId = streets.length ? streets[streets.length-1].id : null;
+    renderStreetList();
     document.getElementById('loading').classList.add('hidden');
     statusEl.className = 'search-status error';
     const msg = err.message.includes('504') || err.message.includes('429')
@@ -981,35 +1143,107 @@ function removeStreet(id, ev) {
   autoSave();
 }
 
+// ── Arrondissement helpers ────────────────────────────────────────────
+/** Trie les arrondissements : 1er < 2e < ... < 20e < "?" */
+function arrSort(a, b) {
+  const parse = s => { const m=s.match(/^(\d+)/); return m?parseInt(m[1]):999; };
+  return parse(a) - parse(b);
+}
+
+/** Sélectionner depuis le dropdown */
+function selectStreetFromDropdown(val) {
+  if (!val) return;
+  selectStreet(parseInt(val));
+  // scroll list to that item
+  const el = document.querySelector(`#street-list [data-sid="${val}"]`);
+  if (el) el.scrollIntoView({block:'nearest'});
+}
+
+/** Obtenir l'arrondissement d'un point via Nominatim (async) */
+async function fetchArrondissement(lat, lon) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&accept-language=fr`);
+    const d = await r.json();
+    const district = d?.address?.city_district || d?.address?.suburb || '';
+    const m = district.match(/^(\d+\w*)\s+[Aa]rrondissement/);
+    return m ? m[1] : (district || '?');
+  } catch { return '?'; }
+}
+
 function renderStreetList() {
-  const el = document.getElementById('street-list');
+  const listEl = document.getElementById('street-list');
+  const selEl  = document.getElementById('street-selector');
+
   if (!streets.length) {
-    el.innerHTML = '<div class="street-list-empty">Aucune rue ajoutée</div>';
+    listEl.innerHTML = '<div class="street-list-empty">Aucune rue ajoutée</div>';
+    selEl.innerHTML  = '<option value="">— Sélectionner une rue —</option>';
     return;
   }
-  el.innerHTML = streets.map(s => {
-    const active = s.id === activeStreetId ? ' active' : '';
-    const loading = s.loading ? ' loading' : '';
-    const pts = s.markers.length;
-    const len = s.loading ? '…' : (()=>{
-      const l = pathLen(s.markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};}));
-      return l>1000 ? (l/1000).toFixed(1)+'km' : Math.round(l)+'m';
-    })();
-    return `<div class="street-list-item${active}${loading}" onclick="selectStreet(${s.id})">
-      <div class="street-dot" style="background:${s.color}"></div>
-      <div class="street-list-name">${s.name}</div>
-      <div class="street-list-meta">${s.loading?'chargement…':pts+'pts · '+len}</div>
-      <button class="street-delete" onclick="removeStreet(${s.id},event)" title="Supprimer">✕</button>
+
+  // ── Helper: display meta ──
+  const getMeta = s => {
+    if (s.loading) return 'chargement…';
+    const l = pathLen(s.markers.map(m=>{const ll=m.getLatLng();return{lat:ll.lat,lon:ll.lng};}));
+    return s.markers.length+'pts · '+(l>1000?(l/1000).toFixed(1)+'km':Math.round(l)+'m');
+  };
+
+  // ── Group by arrondissement ──
+  const groups = {};
+  for (const s of streets) {
+    const arr = s.arrondissement || '?';
+    (groups[arr] = groups[arr]||[]).push(s);
+  }
+  // Sort arrondissements numerically, alphabetically within each group
+  const arrKeys = Object.keys(groups).sort(arrSort);
+  for (const k of arrKeys) groups[k].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+
+  // ── Render list ──
+  listEl.innerHTML = arrKeys.map(arr => {
+    const label = arr === '?' ? 'Arrondissement inconnu' : `${arr} arrondissement`;
+    const items = groups[arr].map(s => {
+      const active  = s.id === activeStreetId ? ' active' : '';
+      const loading = s.loading ? ' loading' : '';
+      return `<div class="street-list-item${active}${loading}" data-sid="${s.id}" onclick="selectStreet(${s.id})">
+        <div class="street-dot" style="background:${s.color}"></div>
+        <div class="street-list-name" title="${s.name}">${s.name}</div>
+        <div class="street-list-meta">${getMeta(s)}</div>
+        <button class="street-delete" onclick="removeStreet(${s.id},event)" title="Supprimer">✕</button>
+      </div>`;
+    }).join('');
+    return `<div class="arr-group">
+      <div class="arr-header">${label}</div>
+      ${items}
     </div>`;
   }).join('');
+
+  // ── Render dropdown ──
+  const selectedId = activeStreetId;
+  let html = '<option value="">— Sélectionner une rue —</option>';
+  for (const arr of arrKeys) {
+    const label = arr === '?' ? 'Arrondissement inconnu' : `${arr} arrondissement`;
+    html += `<optgroup label="${label}">`;
+    for (const s of groups[arr]) {
+      const sel = s.id === selectedId ? ' selected' : '';
+      html += `<option value="${s.id}"${sel}>${s.name}</option>`;
+    }
+    html += `</optgroup>`;
+  }
+  selEl.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════
 //  LINE & MARKERS
 // ═══════════════════════════════════════════════════
-function makeIcon(isEndpoint) {
+function makeIcon(isEndpoint, color) {
+  const col = color || getColor() || '#e74c3c';
   const sz = isEndpoint ? 16 : 12;
-  return L.divIcon({ className:'anchor-handle'+(isEndpoint?' endpoint':''), iconSize:[sz,sz], iconAnchor:[sz/2,sz/2] });
+  const bg = isEndpoint ? col : '#fff';
+  return L.divIcon({
+    className: 'anchor-handle' + (isEndpoint ? ' endpoint' : ''),
+    iconSize: [sz, sz],
+    iconAnchor: [sz/2, sz/2],
+    html: `<div class="ah-inner" style="background:${bg};border-color:${col};"></div>`
+  });
 }
 
 function buildLine(pts) {
@@ -1046,7 +1280,7 @@ function buildLineForStreet(s, pts) {
 function spawnMarker(pt, idx) {
   const s = getActive(); if (!s) return;
   const m = L.marker([pt.lat, pt.lon], {
-    draggable:true, icon:makeIcon(false), zIndexOffset:200
+    draggable:true, icon:makeIcon(false, s.color), zIndexOffset:200
   });
   m.bindTooltip('', {direction:'top', className:'handle-tooltip', opacity:1});
   m._streetId = s.id;  // tag marker with its street
@@ -1080,7 +1314,7 @@ function refreshPolyline() {
 
 function refreshEndpoints() {
   const s = getActive(); if (!s) return;
-  s.markers.forEach((m,i) => m.setIcon(makeIcon(i===0 || i===s.markers.length-1)));
+  s.markers.forEach((m,i) => m.setIcon(makeIcon(i===0 || i===s.markers.length-1, s.color)));
   s.markers.forEach((m,i) => updateTooltip(m,i));
 }
 
@@ -1088,7 +1322,7 @@ function updateTooltip(m, i) {
   const s = getActive(); if (!s) return;
   const ll  = m.getLatLng();
   const ep  = (i===0 || i===s.markers.length-1);
-  const lbl = ep ? (i===0?'🟡 Début':'🟡 Fin') : `Poignée #${i+1}`;
+  const lbl = ep ? (i===0?'● Début':'● Fin') : `Poignée #${i+1}`;
   const geo = showNums ? `<br><span style="color:#6470a8">${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}</span>` : '';
   m.setTooltipContent(`<b>${lbl}</b>${geo}`);
 }
@@ -1153,6 +1387,8 @@ function setLineColor(color, btn) {
   if (s) {
     s.color = color;
     if (s.polyline) s.polyline.setStyle({color});
+    // Rafraîchir toutes les icônes de cette rue avec la nouvelle couleur
+    s.markers.forEach((m, i) => m.setIcon(makeIcon(i===0 || i===s.markers.length-1, color)));
   }
   document.documentElement.style.setProperty('--line-color', color);
   document.getElementById('custom-color').value = color;
@@ -1489,94 +1725,3280 @@ async function loadLatestSave() {
 //  Chargées automatiquement si le serveur n'est pas disponible
 //  Mis à jour le 23/03/2026
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+//  DONNÉES EMBARQUÉES — 105 rues avec arrondissements
+//  Mis à jour le 24/03/2026
+// ═══════════════════════════════════════════════════
 function getEmbeddedGeoJSON() {
+  // Données mises à jour le 24/03/2026 — 105 rues
   return {
-    "type": "FeatureCollection",
-    "features": [
-      {
-        "type": "Feature",
-        "properties": { "name": "Rue de Rivoli", "color": "#e74c3c" },
-        "geometry": {
-          "type": "LineString",
-          "coordinates": [
-            [2.323597669601441,48.86637332881225],[2.324096560478211,48.86629216617396],
-            [2.325915098190308,48.86571343745897],[2.327036261558533,48.865353493053135],
-            [2.328312993049622,48.86493708354968],[2.330083250999451,48.86435128126382],
-            [2.3318213224411015,48.8638007620223],[2.333637177944184,48.86322200449507],
-            [2.3353162407875065,48.86269088270434],[2.337081134319306,48.86214387430383],
-            [2.338545620441437,48.86166744276122],[2.339822351932526,48.86125276717152],
-            [2.3407343029975896,48.86096337451177],[2.341750860214234,48.86060868976249],
-            [2.3431563377380376,48.860158712956114],[2.3448085784912114,48.85962050009043],
-            [2.3466056585311894,48.85905757618],[2.3483303189277653,48.85847346975592],
-            [2.350113987922669,48.85792288585892],[2.3515462875366215,48.8574728849071],
-            [2.3538476228713994,48.85693287842495],[2.3551404476165776,48.85663993129474],
-            [2.3566639423370366,48.856269333071424],[2.358192801475525,48.85589520255827],
-            [2.3595553636550903,48.855612838055364],[2.3608911037445073,48.855266939368754],
-            [2.3619854450225835,48.854959864042286]
-          ]
-        }
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Rivoli",
+        "color": "#e74c3c",
+        "arrondissement": "1er"
       },
-      {
-        "type": "Feature",
-        "properties": { "name": "Boulevard Saint-Germain", "color": "#2ecc71" },
-        "geometry": {
-          "type": "LineString",
-          "coordinates": [
-            [2.3189848,48.8625251],[2.3199242,48.8619004],[2.3206650,48.8611447],
-            [2.3213675,48.8603732],[2.3220889,48.8596094],[2.3228186,48.8588490],
-            [2.3235332,48.8580824],[2.3242593,48.8573204],[2.3250969,48.8566109],
-            [2.3260802,48.8559916],[2.3272089,48.8554849],[2.3284243,48.8550735],
-            [2.3296716,48.8547063],[2.3309374,48.8543677],[2.3322253,48.8540666],
-            [2.3335076,48.8537553],[2.3347896,48.8534434],[2.3360689,48.8531270],
-            [2.3373513,48.8528160],[2.3386332,48.8525041],[2.3399180,48.8521973],
-            [2.3411994,48.8518845],[2.3424792,48.8515688],[2.3437622,48.8512591],
-            [2.3450473,48.8509530],[2.3463334,48.8506487],[2.3476125,48.8503320],
-            [2.3488907,48.8500136],[2.3501698,48.8496968],[2.3515163,48.8495753],
-            [2.3528804,48.8495200],[2.3542440,48.8494604],[2.3556052,48.8493819],
-            [2.3569149,48.8492915],[2.3572253,48.8492523]
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.323597669601441,
+            48.86637332881225
+          ],
+          [
+            2.324096560478211,
+            48.86629216617396
+          ],
+          [
+            2.325915098190308,
+            48.86571343745897
+          ],
+          [
+            2.327036261558533,
+            48.865353493053135
+          ],
+          [
+            2.328312993049622,
+            48.86493708354968
+          ],
+          [
+            2.330083250999451,
+            48.86435128126382
+          ],
+          [
+            2.3318213224411015,
+            48.8638007620223
+          ],
+          [
+            2.333637177944184,
+            48.86322200449507
+          ],
+          [
+            2.3353162407875065,
+            48.86269088270434
+          ],
+          [
+            2.337081134319306,
+            48.86214387430383
+          ],
+          [
+            2.338545620441437,
+            48.86166744276122
+          ],
+          [
+            2.339822351932526,
+            48.86125276717152
+          ],
+          [
+            2.3407343029975896,
+            48.86096337451177
+          ],
+          [
+            2.341750860214234,
+            48.86060868976249
+          ],
+          [
+            2.3431563377380376,
+            48.860158712956114
+          ],
+          [
+            2.3448085784912114,
+            48.85962050009043
+          ],
+          [
+            2.3466056585311894,
+            48.85905757618
+          ],
+          [
+            2.3483303189277653,
+            48.85847346975592
+          ],
+          [
+            2.350113987922669,
+            48.85792288585892
+          ],
+          [
+            2.3515462875366215,
+            48.8574728849071
+          ],
+          [
+            2.3538476228713994,
+            48.85693287842495
+          ],
+          [
+            2.3551404476165776,
+            48.85663993129474
+          ],
+          [
+            2.3566639423370366,
+            48.856269333071424
+          ],
+          [
+            2.358192801475525,
+            48.85589520255827
+          ],
+          [
+            2.3595553636550903,
+            48.855612838055364
+          ],
+          [
+            2.3608911037445073,
+            48.855266939368754
+          ],
+          [
+            2.3619854450225835,
+            48.854959864042286
           ]
-        }
-      },
-      {
-        "type": "Feature",
-        "properties": { "name": "Rue de Rennes", "color": "#3498db" },
-        "geometry": {
-          "type": "LineString",
-          "coordinates": [
-            [2.3241805,48.844189],[2.3249156,48.8449471],[2.3256507,48.8457053],
-            [2.3263857,48.8464634],[2.3271208,48.8472215],[2.3278360,48.8479877],
-            [2.3285231,48.8487651],[2.3292102,48.8495425],[2.3298972,48.8503199],
-            [2.3305843,48.8510973],[2.3312714,48.8518747],[2.3319585,48.8526522],
-            [2.3326455,48.8534296],[2.3328713,48.853685]
-          ]
-        }
+        ]
       }
-    ]
-  };
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard Saint-Germain",
+        "color": "#3498db",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3189848,
+            48.8625251
+          ],
+          [
+            2.3199242293904736,
+            48.86190037710674
+          ],
+          [
+            2.3206650353369853,
+            48.86114471699693
+          ],
+          [
+            2.321367512241486,
+            48.86037322972502
+          ],
+          [
+            2.322088890672565,
+            48.85960939593825
+          ],
+          [
+            2.3228185936202848,
+            48.85884897223719
+          ],
+          [
+            2.3235332319594924,
+            48.85808236531717
+          ],
+          [
+            2.3242592999652665,
+            48.85732041287549
+          ],
+          [
+            2.3250968966008223,
+            48.85661091882526
+          ],
+          [
+            2.326080170710182,
+            48.85599158523842
+          ],
+          [
+            2.3272089056716663,
+            48.85548488874231
+          ],
+          [
+            2.3284242776647233,
+            48.855073458471836
+          ],
+          [
+            2.32967159568585,
+            48.85470628425199
+          ],
+          [
+            2.330937419627578,
+            48.85436769880636
+          ],
+          [
+            2.33222534274499,
+            48.85406662351708
+          ],
+          [
+            2.3335076025366845,
+            48.85375527685671
+          ],
+          [
+            2.3347895869045803,
+            48.85344344363962
+          ],
+          [
+            2.33606893779293,
+            48.85312701697979
+          ],
+          [
+            2.337351337425584,
+            48.8528159873795
+          ],
+          [
+            2.3386332430253924,
+            48.85250408120275
+          ],
+          [
+            2.3399179945271023,
+            48.85219730297036
+          ],
+          [
+            2.3411993933096062,
+            48.85188449949883
+          ],
+          [
+            2.342479150069476,
+            48.8515688243096
+          ],
+          [
+            2.3437621979286516,
+            48.85125905573545
+          ],
+          [
+            2.345047299381435,
+            48.85095295617089
+          ],
+          [
+            2.3463333980524412,
+            48.85064871655733
+          ],
+          [
+            2.3476125288636225,
+            48.85033200685961
+          ],
+          [
+            2.348890660223485,
+            48.85001356990704
+          ],
+          [
+            2.350169760250806,
+            48.849696844714245
+          ],
+          [
+            2.351516295325569,
+            48.849575341535456
+          ],
+          [
+            2.3528803745317863,
+            48.84951999186779
+          ],
+          [
+            2.3542440259744755,
+            48.84946037592752
+          ],
+          [
+            2.3556052310174964,
+            48.84938189831415
+          ],
+          [
+            2.3569149364297504,
+            48.84929148686634
+          ],
+          [
+            2.3572253,
+            48.8492523
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Rennes",
+        "color": "#27ae60",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3241805,
+            48.844189
+          ],
+          [
+            2.324915579562531,
+            48.84494713553227
+          ],
+          [
+            2.3256506591250625,
+            48.84570527106455
+          ],
+          [
+            2.3263857386875935,
+            48.846463406596826
+          ],
+          [
+            2.3271208182501244,
+            48.847221542129105
+          ],
+          [
+            2.3278359993935274,
+            48.847987669325136
+          ],
+          [
+            2.3285230777761106,
+            48.848765083237645
+          ],
+          [
+            2.3292101561586938,
+            48.849542497150146
+          ],
+          [
+            2.329897234541277,
+            48.850319911062655
+          ],
+          [
+            2.33058431292386,
+            48.851097324975164
+          ],
+          [
+            2.3312713913064433,
+            48.85187473888767
+          ],
+          [
+            2.3319584696890265,
+            48.852652152800175
+          ],
+          [
+            2.3326455480716097,
+            48.853429566712684
+          ],
+          [
+            2.3328713,
+            48.853685
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Horloge",
+        "color": "#f39c12",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3413568,
+            48.8571372
+          ],
+          [
+            2.3427004154038515,
+            48.85699680249374
+          ],
+          [
+            2.344043704199383,
+            48.8568398832992
+          ],
+          [
+            2.345348701490937,
+            48.85657376288746
+          ],
+          [
+            2.3464808,
+            48.8561977
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai des Orfèvres",
+        "color": "#9b59b6",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.341281,
+            48.8568615
+          ],
+          [
+            2.341978936457506,
+            48.85625478329137
+          ],
+          [
+            2.3427930336500493,
+            48.85553239594167
+          ],
+          [
+            2.343695206725085,
+            48.85486215369569
+          ],
+          [
+            2.344837372355235,
+            48.85436839863144
+          ],
+          [
+            2.3449201,
+            48.8543358
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Harlay",
+        "color": "#1abc9c",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3424924,
+            48.8557924
+          ],
+          [
+            2.3428684296932056,
+            48.85615637243733
+          ],
+          [
+            2.343185609319394,
+            48.856554674004244
+          ],
+          [
+            2.3434783,
+            48.8569221
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Cité",
+        "color": "#e67e22",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3470489,
+            48.8534759
+          ],
+          [
+            2.34728623638932,
+            48.85389756186073
+          ],
+          [
+            2.3475329516589003,
+            48.854316895776535
+          ],
+          [
+            2.3477798919048323,
+            48.854736172527325
+          ],
+          [
+            2.3480299967739198,
+            48.855154639385766
+          ],
+          [
+            2.348283597225539,
+            48.85557218642024
+          ],
+          [
+            2.3483752,
+            48.8557133
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue d'Arcole",
+        "color": "#16a085",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3491944,
+            48.8536115
+          ],
+          [
+            2.349487208641471,
+            48.85401779532869
+          ],
+          [
+            2.349782034320006,
+            48.85442345854254
+          ],
+          [
+            2.350081921766454,
+            48.85482750597587
+          ],
+          [
+            2.3502619,
+            48.8550649
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Ursins",
+        "color": "#c0392b",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3505464,
+            48.8546829
+          ],
+          [
+            2.351044759158996,
+            48.8543760890208
+          ],
+          [
+            2.3514976637385754,
+            48.85404010412249
+          ],
+          [
+            2.3516816,
+            48.853826
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Massillon",
+        "color": "#2980b9",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3505561,
+            48.85315
+          ],
+          [
+            2.3508511628032553,
+            48.85355558769604
+          ],
+          [
+            2.3509197,
+            48.85365
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Cloître Notre-Dame",
+        "color": "#27ae60",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3491944,
+            48.8536115
+          ],
+          [
+            2.349783654264597,
+            48.85339321760969
+          ],
+          [
+            2.350400095932714,
+            48.853199120520195
+          ],
+          [
+            2.3505561,
+            48.85315
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Archevêché",
+        "color": "#d35400",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3517222,
+            48.8517978
+          ],
+          [
+            2.35198333676471,
+            48.852213333725395
+          ],
+          [
+            2.352205044793799,
+            48.85263676099387
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai aux Fleurs",
+        "color": "#8e44ad",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3502619,
+            48.8550649
+          ],
+          [
+            2.3512954955570393,
+            48.85448215906825
+          ],
+          [
+            2.351952461142323,
+            48.853698281891575
+          ],
+          [
+            2.352168938118373,
+            48.852812199537794
+          ],
+          [
+            2.3522069,
+            48.8526464
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard du Palais",
+        "color": "#f1c40f",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3447702,
+            48.8543023
+          ],
+          [
+            2.345537197180988,
+            48.855046616657425
+          ],
+          [
+            2.346178674530544,
+            48.85583891841001
+          ],
+          [
+            2.3461485126379835,
+            48.8556488664831
+          ],
+          [
+            2.3454634670541266,
+            48.85487234841362
+          ],
+          [
+            2.3448485,
+            48.8542668
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Chanoinesse",
+        "color": "#e74c3c",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3497523,
+            48.8543844
+          ],
+          [
+            2.3503033002511997,
+            48.854125083959275
+          ],
+          [
+            2.3507766499531204,
+            48.85380086083318
+          ],
+          [
+            2.3511936467391275,
+            48.853448892680674
+          ],
+          [
+            2.3512252359175774,
+            48.85301954227076
+          ],
+          [
+            2.3511918,
+            48.8529517
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont Neuf",
+        "color": "#3498db",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3415203,
+            48.8573177
+          ],
+          [
+            2.3417780407694395,
+            48.85763837535921
+          ],
+          [
+            2.3421003073218127,
+            48.85803490762433
+          ],
+          [
+            2.3424225619564467,
+            48.85843144569252
+          ],
+          [
+            2.3424643,
+            48.8584826
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Corse",
+        "color": "#27ae60",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3464808,
+            48.8561977
+          ],
+          [
+            2.347732620923424,
+            48.85583659548454
+          ],
+          [
+            2.348984628514263,
+            48.855475951556755
+          ],
+          [
+            2.3502133916341807,
+            48.85508299638518
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Colombe",
+        "color": "#e74c3c",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3507403,
+            48.8548464
+          ],
+          [
+            2.3500601,
+            48.8543128
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Lutèce",
+        "color": "#3498db",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3458262,
+            48.8553533
+          ],
+          [
+            2.3470392079919606,
+            48.85493882942875
+          ],
+          [
+            2.3477572,
+            48.8546935
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Aubé",
+        "color": "#27ae60",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3470453,
+            48.8552505
+          ],
+          [
+            2.3474649,
+            48.8559138
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Promenade Maurice Carême",
+        "color": "#f39c12",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3473584,
+            48.8533152
+          ],
+          [
+            2.348519001705999,
+            48.852840240539386
+          ],
+          [
+            2.3496796034119973,
+            48.85236528107878
+          ],
+          [
+            2.3509505981759853,
+            48.85203711315585
+          ],
+          [
+            2.3515753,
+            48.8518811
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont de l'Archevêché",
+        "color": "#9b59b6",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3513306,
+            48.8511676
+          ],
+          [
+            2.3517222,
+            48.8517978
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont au Double",
+        "color": "#1abc9c",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3482798,
+            48.8523914
+          ],
+          [
+            2.3485529,
+            48.8527643
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Port de Montebello",
+        "color": "#e67e22",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3470228,
+            48.8531209
+          ],
+          [
+            2.34813078116664,
+            48.85259433822765
+          ],
+          [
+            2.3492716367656703,
+            48.8521027648882
+          ],
+          [
+            2.3504825804258433,
+            48.8516857866443
+          ],
+          [
+            2.3513044,
+            48.8514028
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pont Saint-Louis",
+        "color": "#16a085",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3522069,
+            48.8526464
+          ],
+          [
+            2.3532251,
+            48.8528679
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Montebello",
+        "color": "#c0392b",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.350421,
+            48.8514761
+          ],
+          [
+            2.3500882917825416,
+            48.851615061414456
+          ],
+          [
+            2.3489343832271388,
+            48.852097011533495
+          ],
+          [
+            2.3477804746717355,
+            48.85257896165254
+          ],
+          [
+            2.3467429,
+            48.8531623
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Huchette",
+        "color": "#2980b9",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.346605465402849,
+            48.852765622209866
+          ],
+          [
+            2.3453253327014245,
+            48.85308071110494
+          ],
+          [
+            2.3440452,
+            48.8533958
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Promenade René Capitant",
+        "color": "#8e44ad",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3442301,
+            48.8539492
+          ],
+          [
+            2.3454761398686497,
+            48.85357963118731
+          ],
+          [
+            2.3467221797373,
+            48.85321006237462
+          ],
+          [
+            2.3470228,
+            48.8531209
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai Saint-Michel",
+        "color": "#d35400",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3443857,
+            48.8538084
+          ],
+          [
+            2.3456518199756933,
+            48.85346966703259
+          ],
+          [
+            2.3468007,
+            48.8531623
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Xavier Privas",
+        "color": "#f1c40f",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.345854337570636,
+            48.853253645609676
+          ],
+          [
+            2.3451271,
+            48.8524922
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Grands Degrés",
+        "color": "#2ecc71",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3502166,
+            48.8512351
+          ],
+          [
+            2.3493991,
+            48.8514072
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Lagrange",
+        "color": "#1abc9c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3482382,
+            48.8523487
+          ],
+          [
+            2.347767603423881,
+            48.85158992313987
+          ],
+          [
+            2.3483861017119407,
+            48.850787961569935
+          ],
+          [
+            2.3490046,
+            48.849986
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Hôtel Colbert",
+        "color": "#e74c3c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3492382,
+            48.8519724
+          ],
+          [
+            2.349052299016568,
+            48.85188131272304
+          ],
+          [
+            2.3479561,
+            48.8513442
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Haut Pavé",
+        "color": "#3498db",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3493727,
+            48.8514629
+          ],
+          [
+            2.3495522,
+            48.8517753
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Frédéric Sauton",
+        "color": "#27ae60",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3487708,
+            48.8504073
+          ],
+          [
+            2.349248624978495,
+            48.85124986760273
+          ],
+          [
+            2.3493218,
+            48.8513789
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Trois Portes",
+        "color": "#f39c12",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3481229,
+            48.8513912
+          ],
+          [
+            2.3490314,
+            48.8508714
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Maître Albert",
+        "color": "#9b59b6",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.350421,
+            48.8514343
+          ],
+          [
+            2.3498618173322785,
+            48.85084391529001
+          ],
+          [
+            2.3488497,
+            48.8504117
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bièvre 1",
+        "color": "#1abc9c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3204482,
+            48.800275
+          ],
+          [
+            2.321811495688526,
+            48.80022596935462
+          ],
+          [
+            2.3219024,
+            48.8002227
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bièvre 2",
+        "color": "#e67e22",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.32249,
+            48.8017775
+          ],
+          [
+            2.3225192,
+            48.8018562
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bièvre 3",
+        "color": "#16a085",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3523578,
+            48.8137995
+          ],
+          [
+            2.3533558170977686,
+            48.81329024641467
+          ],
+          [
+            2.3537257,
+            48.8131258
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Bernardins",
+        "color": "#c0392b",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3513069,
+            48.851112
+          ],
+          [
+            2.350957708054449,
+            48.85056698421263
+          ],
+          [
+            2.3504267692812397,
+            48.84973829953873
+          ],
+          [
+            2.3498007387327755,
+            48.8489392622457
+          ],
+          [
+            2.3491626,
+            48.848144
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Pontoise",
+        "color": "#2980b9",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3526134,
+            48.8507445
+          ],
+          [
+            2.3520725207514284,
+            48.84999532322309
+          ],
+          [
+            2.351486060375714,
+            48.849183011611544
+          ],
+          [
+            2.3508996,
+            48.8483707
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Poissy",
+        "color": "#8e44ad",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3535052,
+            48.8504134
+          ],
+          [
+            2.3534588022376934,
+            48.85035063605054
+          ],
+          [
+            2.352860968158462,
+            48.849541924033694
+          ],
+          [
+            2.352263134079231,
+            48.848733212016846
+          ],
+          [
+            2.3516653,
+            48.8479245
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Port de la Tournelle",
+        "color": "#d35400",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3513044,
+            48.8514028
+          ],
+          [
+            2.352255001298513,
+            48.85103147997776
+          ],
+          [
+            2.3529311501257544,
+            48.850785330935516
+          ],
+          [
+            2.3537974802794097,
+            48.85058577390645
+          ],
+          [
+            2.3548708122546067,
+            48.850449492804195
+          ],
+          [
+            2.355839094634172,
+            48.8499733198344
+          ],
+          [
+            2.3569929577013116,
+            48.84959455621478
+          ],
+          [
+            2.358051285449976,
+            48.84932378389477
+          ],
+          [
+            2.3589543,
+            48.8489748
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Tournelle",
+        "color": "#f1c40f",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3504558,
+            48.8514761
+          ],
+          [
+            2.351627210675599,
+            48.851012812610016
+          ],
+          [
+            2.3528652181712886,
+            48.850632555275965
+          ],
+          [
+            2.35410728432867,
+            48.85025735810705
+          ],
+          [
+            2.3553493504860517,
+            48.84988216093814
+          ],
+          [
+            2.356591416643433,
+            48.84950696376923
+          ],
+          [
+            2.3568366,
+            48.8494329
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard Saint-Michel 1",
+        "color": "#2ecc71",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3391186,
+            48.8442974
+          ],
+          [
+            2.338677172538346,
+            48.843473587956375
+          ],
+          [
+            2.338222715025564,
+            48.84262545863758
+          ],
+          [
+            2.337768257512782,
+            48.84177732931879
+          ],
+          [
+            2.3373138,
+            48.8409292
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Boulevard Saint-Michel 2",
+        "color": "#1abc9c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3441309,
+            48.8533927
+          ],
+          [
+            2.3437188453863578,
+            48.85255421303381
+          ],
+          [
+            2.343298333723529,
+            48.85169851687913
+          ],
+          [
+            2.342877822060701,
+            48.850842820724445
+          ],
+          [
+            2.342455068170871,
+            48.84998767356868
+          ],
+          [
+            2.3419234932814446,
+            48.84915917073134
+          ],
+          [
+            2.341391918392018,
+            48.84833066789401
+          ],
+          [
+            2.340860343502592,
+            48.847502165056675
+          ],
+          [
+            2.340468924109735,
+            48.846645571956486
+          ],
+          [
+            2.3400044,
+            48.8457998
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Harpe",
+        "color": "#e74c3c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3445887,
+            48.8532442
+          ],
+          [
+            2.344630286774112,
+            48.85293101320923
+          ],
+          [
+            2.34433864633987,
+            48.852104699645174
+          ],
+          [
+            2.3435767,
+            48.8513581
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Saint-Séverin",
+        "color": "#3498db",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3438219,
+            48.8527586
+          ],
+          [
+            2.345107679074711,
+            48.852453656019165
+          ],
+          [
+            2.3462784,
+            48.852176
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Petit Pont",
+        "color": "#27ae60",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3463622,
+            48.8521797
+          ],
+          [
+            2.346877193079788,
+            48.8530031053186
+          ],
+          [
+            2.3469399,
+            48.8530656
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Parcheminerie",
+        "color": "#f39c12",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3442151,
+            48.8519573
+          ],
+          [
+            2.345419897774437,
+            48.851532687750655
+          ],
+          [
+            2.3458171,
+            48.8513927
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Boutebrie",
+        "color": "#9b59b6",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3444781,
+            48.8510869
+          ],
+          [
+            2.3448364,
+            48.8517206
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Dante",
+        "color": "#1abc9c",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3455155,
+            48.8508423
+          ],
+          [
+            2.3467051912282413,
+            48.85128495673048
+          ],
+          [
+            2.347256,
+            48.8514899
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Galande",
+        "color": "#e67e22",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3479806,
+            48.8513149
+          ],
+          [
+            2.34721313370562,
+            48.85150166424673
+          ],
+          [
+            2.3463478,
+            48.852176
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Domat",
+        "color": "#16a085",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.347547,
+            48.8506747
+          ],
+          [
+            2.3474474110310783,
+            48.85070385357564
+          ],
+          [
+            2.3461987,
+            48.8510694
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Anglais",
+        "color": "#c0392b",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3481388,
+            48.8510412
+          ],
+          [
+            2.3473064,
+            48.8504099
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de la Bûcherie",
+        "color": "#2980b9",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3493417,
+            48.8514173
+          ],
+          [
+            2.3487680924701424,
+            48.85167206688673
+          ],
+          [
+            2.3478392166268796,
+            48.85231950387564
+          ],
+          [
+            2.3467178,
+            48.8528336
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Serpente 1",
+        "color": "#8e44ad",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3405938,
+            48.852497
+          ],
+          [
+            2.340980713380343,
+            48.85245847772524
+          ],
+          [
+            2.3421294300706417,
+            48.85229310774052
+          ],
+          [
+            2.3433269,
+            48.8518596
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Serpente 2",
+        "color": "#d35400",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.2468969,
+            48.9171668
+          ],
+          [
+            2.2463498322372297,
+            48.91764084261361
+          ],
+          [
+            2.2456326,
+            48.9170199
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai des Grands Augustins",
+        "color": "#f1c40f",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3443857,
+            48.8538084
+          ],
+          [
+            2.3433101911751772,
+            48.85423728127996
+          ],
+          [
+            2.3422736303906646,
+            48.85481775206455
+          ],
+          [
+            2.3413680651953324,
+            48.855491376032276
+          ],
+          [
+            2.3404625,
+            48.856165
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Savoie 1",
+        "color": "#2ecc71",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.4815085,
+            48.8102444
+          ],
+          [
+            2.4819875,
+            48.8110119
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Savoie 2",
+        "color": "#1abc9c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.4575228,
+            48.9121792
+          ],
+          [
+            2.4565329421192037,
+            48.912800143000055
+          ],
+          [
+            2.4557311,
+            48.9130362
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Séguier",
+        "color": "#e74c3c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3415258,
+            48.8534034
+          ],
+          [
+            2.3421823102240533,
+            48.85419218439654
+          ],
+          [
+            2.3425388,
+            48.8546205
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Gît-le-Cœur",
+        "color": "#3498db",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.34232,
+            48.8533454
+          ],
+          [
+            2.3430218406884076,
+            48.854117100206636
+          ],
+          [
+            2.343185,
+            48.8542965
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Saint-André des Arts",
+        "color": "#27ae60",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3431937,
+            48.8531991
+          ],
+          [
+            2.342442367029873,
+            48.85327182678126
+          ],
+          [
+            2.3410901446865817,
+            48.85340271785417
+          ],
+          [
+            2.339737922343291,
+            48.85353360892709
+          ],
+          [
+            2.3383857,
+            48.8536645
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Suger",
+        "color": "#f39c12",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3427976,
+            48.8530034
+          ],
+          [
+            2.342066907864028,
+            48.85297574446049
+          ],
+          [
+            2.3407024,
+            48.8529241
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Danton 1",
+        "color": "#9b59b6",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.2007826,
+            48.876395
+          ],
+          [
+            2.200093981974922,
+            48.87671516236896
+          ],
+          [
+            2.1989774,
+            48.8772343
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Danton 2",
+        "color": "#1abc9c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.4466933,
+            48.8660641
+          ],
+          [
+            2.4479467378296778,
+            48.86570505822741
+          ],
+          [
+            2.4492609851806373,
+            48.86545777762136
+          ],
+          [
+            2.45059276172926,
+            48.86528319641896
+          ],
+          [
+            2.4519261816222064,
+            48.86512978585987
+          ],
+          [
+            2.4532279120165517,
+            48.86485503220415
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Éperon",
+        "color": "#e67e22",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3405212,
+            48.852155
+          ],
+          [
+            2.340744591716027,
+            48.853041098607136
+          ],
+          [
+            2.3409582,
+            48.8533828
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Ancienne Comédie",
+        "color": "#16a085",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3384148,
+            48.8536645
+          ],
+          [
+            2.3385326236811173,
+            48.853354739363525
+          ],
+          [
+            2.3387535,
+            48.8524745
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Christine",
+        "color": "#c0392b",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3405894,
+            48.8542874
+          ],
+          [
+            2.3393745,
+            48.8546974
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Dauphine",
+        "color": "#2980b9",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3383857,
+            48.8536645
+          ],
+          [
+            2.33906005872162,
+            48.854446742276984
+          ],
+          [
+            2.33973441744324,
+            48.85522898455397
+          ],
+          [
+            2.340366028923121,
+            48.85602191314615
+          ],
+          [
+            2.3404015,
+            48.8561313
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Nevers",
+        "color": "#8e44ad",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3386577,
+            48.8553621
+          ],
+          [
+            2.33971498153031,
+            48.855932060431606
+          ],
+          [
+            2.3404015,
+            48.8561313
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Guénégaud",
+        "color": "#d35400",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3395288,
+            48.8562267
+          ],
+          [
+            2.3399774,
+            48.8564593
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Conti",
+        "color": "#f1c40f",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3404625,
+            48.856165
+          ],
+          [
+            2.340303858598938,
+            48.8562576943336
+          ],
+          [
+            2.339281835525124,
+            48.8568548634655
+          ],
+          [
+            2.338374336483158,
+            48.85702893833912
+          ],
+          [
+            2.3375704277204115,
+            48.85765420521501
+          ],
+          [
+            2.3362748,
+            48.8579408
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Passage Dauphine",
+        "color": "#2ecc71",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3380189,
+            48.854775
+          ],
+          [
+            2.3393094660168483,
+            48.854700010523636
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Buci",
+        "color": "#1abc9c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3358949,
+            48.8531684
+          ],
+          [
+            2.336842689114231,
+            48.8537987401462
+          ],
+          [
+            2.3381623625650167,
+            48.85369342858649
+          ],
+          [
+            2.3383857,
+            48.8536645
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Échaudé",
+        "color": "#e74c3c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3355212,
+            48.8532648
+          ],
+          [
+            2.3360999917830325,
+            48.85407950621211
+          ],
+          [
+            2.3366787835660645,
+            48.85489421242422
+          ],
+          [
+            2.3368031,
+            48.8550692
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Cardinale",
+        "color": "#3498db",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3359268,
+            48.8539972
+          ],
+          [
+            2.3358743,
+            48.8544841
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Abbaye 1",
+        "color": "#27ae60",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.2301652,
+            48.8160328
+          ],
+          [
+            2.229228186817984,
+            48.81574560494279
+          ],
+          [
+            2.22799,
+            48.8153661
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de l'Abbaye 2",
+        "color": "#f39c12",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.4745983,
+            48.8135017
+          ],
+          [
+            2.475009639087389,
+            48.814359260207425
+          ],
+          [
+            2.475149,
+            48.8146498
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue du Jardinet",
+        "color": "#9b59b6",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3397002,
+            48.8528777
+          ],
+          [
+            2.3405635,
+            48.8523541
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Cour de Rohan 1",
+        "color": "#1abc9c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3391414,
+            48.8530827
+          ],
+          [
+            2.3395574,
+            48.8529765
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Cour de Rohan 2",
+        "color": "#e67e22",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3594676,
+            48.8596398
+          ],
+          [
+            2.3599422,
+            48.8595983
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Mignon",
+        "color": "#16a085",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3414433,
+            48.8518287
+          ],
+          [
+            2.3417861,
+            48.8524174
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Hautefeuille",
+        "color": "#c0392b",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3432362,
+            48.8528759
+          ],
+          [
+            2.3428523251159743,
+            48.852371056690586
+          ],
+          [
+            2.3420334080689993,
+            48.85166048546434
+          ],
+          [
+            2.3413187,
+            48.8508967
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Mazarine",
+        "color": "#2980b9",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3383857,
+            48.8536645
+          ],
+          [
+            2.3380358763794407,
+            48.854533868019786
+          ],
+          [
+            2.337686052758882,
+            48.855403236039564
+          ],
+          [
+            2.3373362291383226,
+            48.85627260405935
+          ],
+          [
+            2.3368489675891877,
+            48.85705952789877
+          ],
+          [
+            2.3365864,
+            48.8571228
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Seine 1",
+        "color": "#8e44ad",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.227751,
+            48.9214259
+          ],
+          [
+            2.2273033582103365,
+            48.921015962703464
+          ],
+          [
+            2.2267384,
+            48.9205867
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Seine 2",
+        "color": "#d35400",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.2274672,
+            48.9198284
+          ],
+          [
+            2.2274159,
+            48.9199155
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Seine 3",
+        "color": "#f1c40f",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3365215,
+            48.8570788
+          ],
+          [
+            2.3360807,
+            48.857598
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue de Seine 4",
+        "color": "#2ecc71",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.419219,
+            48.8105617
+          ],
+          [
+            2.4205581950429567,
+            48.810737728799054
+          ],
+          [
+            2.4209901,
+            48.8107945
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Bonaparte",
+        "color": "#1abc9c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3353448,
+            48.8577271
+          ],
+          [
+            2.335222200791762,
+            48.85753266713459
+          ],
+          [
+            2.3346984217300726,
+            48.85670199403916
+          ],
+          [
+            2.334174642668384,
+            48.855871320943734
+          ],
+          [
+            2.333779853537194,
+            48.85501320698373
+          ],
+          [
+            2.333465286649063,
+            48.854138026825595
+          ],
+          [
+            2.333314121493422,
+            48.85325464414414
+          ],
+          [
+            2.333134764931159,
+            48.85236309991374
+          ],
+          [
+            2.332955408368896,
+            48.85147155568333
+          ],
+          [
+            2.3327760518066336,
+            48.85058001145293
+          ],
+          [
+            2.3327217426264735,
+            48.8496842429036
+          ],
+          [
+            2.3327614,
+            48.8487853
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Beaux-Arts",
+        "color": "#e74c3c",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3346703,
+            48.8564779
+          ],
+          [
+            2.3360216971281833,
+            48.85634302393382
+          ],
+          [
+            2.3366181,
+            48.8562835
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Visconti",
+        "color": "#3498db",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3364943,
+            48.8556916
+          ],
+          [
+            2.3367144,
+            48.8556694
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Jacob 1",
+        "color": "#27ae60",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3340451,
+            48.8554689
+          ],
+          [
+            2.332873445272934,
+            48.855886635834686
+          ],
+          [
+            2.3316717,
+            48.8563151
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Jacob 2",
+        "color": "#f39c12",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.336101,
+            48.8547693
+          ],
+          [
+            2.3368794,
+            48.8545063
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai du Louvre",
+        "color": "#9b59b6",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3424643,
+            48.8584826
+          ],
+          [
+            2.341159184410777,
+            48.85873561174439
+          ],
+          [
+            2.339848,
+            48.8589898
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de la Mégisserie",
+        "color": "#1abc9c",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3424643,
+            48.8584826
+          ],
+          [
+            2.34372973689139,
+            48.85814258558996
+          ],
+          [
+            2.344995173782779,
+            48.85780257117992
+          ],
+          [
+            2.346260610674169,
+            48.85746255676988
+          ],
+          [
+            2.3471157,
+            48.8572328
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de Gesvres",
+        "color": "#e67e22",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3507047,
+            48.8560699
+          ],
+          [
+            2.349592776887797,
+            48.85647832167039
+          ],
+          [
+            2.3483779396411246,
+            48.85688771357007
+          ],
+          [
+            2.3471157,
+            48.8572328
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai de l'Hôtel de Ville",
+        "color": "#16a085",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3507047,
+            48.8560699
+          ],
+          [
+            2.351892985081042,
+            48.855625483781076
+          ],
+          [
+            2.3527928381143948,
+            48.85533910116823
+          ],
+          [
+            2.3538214346682076,
+            48.85486694887991
+          ],
+          [
+            2.355008595358509,
+            48.85442880190267
+          ],
+          [
+            2.356156879848283,
+            48.85395537598723
+          ],
+          [
+            2.3573971957843325,
+            48.853577553709464
+          ],
+          [
+            2.357833,
+            48.8534448
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Allée Célestin Hennion",
+        "color": "#c0392b",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3472914,
+            48.8550911
+          ],
+          [
+            2.3477466,
+            48.8558323
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quai du Marché Neuf - Maurice Grimaud",
+        "color": "#2980b9",
+        "arrondissement": "4e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3449201,
+            48.8543358
+          ],
+          [
+            2.3461428790409555,
+            48.853933985153326
+          ],
+          [
+            2.3471139,
+            48.8536149
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue Cochin",
+        "color": "#8e44ad",
+        "arrondissement": "5e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3523394,
+            48.8502644
+          ],
+          [
+            2.3532164,
+            48.8499694
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Rue des Poitevins",
+        "color": "#d35400",
+        "arrondissement": "6e"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.3421619,
+            48.8525796
+          ],
+          [
+            2.3429064,
+            48.8524198
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Voie Georges-Pompidou",
+        "color": "#f1c40f",
+        "arrondissement": "1er"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            2.2989008,
+            48.8639207
+          ],
+          [
+            2.300185286048259,
+            48.864124602973625
+          ],
+          [
+            2.3015196454439018,
+            48.864320166984406
+          ],
+          [
+            2.302854004839545,
+            48.864515730995194
+          ],
+          [
+            2.304193825097507,
+            48.8645724420321
+          ],
+          [
+            2.305554260311622,
+            48.86466028426172
+          ],
+          [
+            2.3069178026891493,
+            48.864715742967306
+          ],
+          [
+            2.3082844831534435,
+            48.864737638376155
+          ],
+          [
+            2.3096511636177377,
+            48.864759533785005
+          ],
+          [
+            2.311017844082032,
+            48.864781429193854
+          ],
+          [
+            2.312384524546326,
+            48.86480332460271
+          ],
+          [
+            2.3137512050106204,
+            48.86482522001156
+          ],
+          [
+            2.315117830059795,
+            48.864813038693626
+          ],
+          [
+            2.316484436156609,
+            48.86478920289566
+          ],
+          [
+            2.317851042253423,
+            48.86476536709768
+          ],
+          [
+            2.3191375122342666,
+            48.86454835841791
+          ],
+          [
+            2.3203330950050742,
+            48.8641122607036
+          ],
+          [
+            2.3215286777758823,
+            48.863676162989286
+          ],
+          [
+            2.3218858,
+            48.8635459
+          ]
+        ]
+      }
+    }
+  ]
+};
 }
 
-/**
- * Charge les rues depuis un objet GeoJSON (serveur ou embarqué).
- */
+
 function loadGeoJSONFeatures(geojson) {
   const features = geojson.features.filter(f => f.geometry?.type === 'LineString');
+  const streetsNeedingArr = [];
   for (const feat of features) {
     const pts = feat.geometry.coordinates.map(([lng,lat])=>({lat,lon:lng}));
     if (pts.length < 2) continue;
     const name = feat.properties?.name || 'Rue importée';
     if (streets.find(s => s.name === name)) continue;
     const color = feat.properties?.color || feat.properties?.line_color || STREET_COLORS[streets.length % STREET_COLORS.length];
+    const arrondissement = feat.properties?.arrondissement || null;
     const id = ++streetIdCounter;
     const s = {
       id, name, markers: [], polyline: null, hitPolyline: null,
-      bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false
+      bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false,
+      arrondissement
     };
     streets.push(s);
     activeStreetId = id;
     buildLineForStreet(s, pts);
+    if (!arrondissement) streetsNeedingArr.push(s);
   }
   renderStreetList();
   updateStats();
+  // Fetch arrondissements for streets that don't have one (staggered to avoid rate-limit)
+  streetsNeedingArr.forEach((s, i) => {
+    setTimeout(() => {
+      const mid = s.markers[Math.floor(s.markers.length/2)];
+      if (!mid) return;
+      const ll = mid.getLatLng();
+      fetchArrondissement(ll.lat, ll.lng).then(arr => {
+        s.arrondissement = arr;
+        renderStreetList();
+      });
+    }, i * 1200);
+  });
 }
 
 // ═══════════════════════════════════════════════════
