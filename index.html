@@ -1946,9 +1946,7 @@ function toggleNumbers(on) { showNums=on; const s=getActive(); if(s) s.markers.f
 function setStatus(msg,type='loading') { document.getElementById('status-text').textContent=msg; document.getElementById('status-dot').className=type; }
 
 function fitStreet() {
-  // Fit all streets or just active
-  const allMarkers = streets.flatMap(s => s.markers);
-  if (allMarkers.length) map.fitBounds(L.latLngBounds(allMarkers.map(m=>m.getLatLng())),{padding:[40,60]});
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 }
 
 function resetLine() {
