@@ -539,7 +539,10 @@ Object.defineProperty(window, 'lineColor',   { get(){ return getColor(); }, set(
 // ═══════════════════════════════════════════════════
 //  MAP INIT
 // ═══════════════════════════════════════════════════
-map = L.map('map', { zoomControl: false, center: [48.8610, 2.340], zoom: 14 });
+// Vue par défaut : Hôtel de Ville de Paris, zoom 16
+const DEFAULT_CENTER = [48.8566, 2.3522];
+const DEFAULT_ZOOM   = 16;
+map = L.map('map', { zoomControl: false, center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -1716,7 +1719,12 @@ function importJSON(ev) {
       else if (data.type==='FeatureCollection') {
         for (const f of (data.features||[])) {
           if (f.geometry?.type==='LineString') {
-            featuresToImport.push({ name: f.properties?.name || 'Rue importée', coords: f.geometry.coordinates, color: f.properties?.line_color });
+            featuresToImport.push({
+              name:          f.properties?.name || 'Rue importée',
+              coords:        f.geometry.coordinates,
+              color:         f.properties?.line_color || f.properties?.color || null,
+              arrondissement: f.properties?.arrondissement || null
+            });
           }
         }
       }
@@ -1731,22 +1739,54 @@ function importJSON(ev) {
       if (!featuresToImport.length) throw new Error('Format non reconnu ou données insuffisantes');
 
       let imported = 0;
+      const streetsNeedingArr = [];
       for (const feat of featuresToImport) {
         let pts = feat.rawPts || feat.coords.map(([lng,lat])=>({lat,lon:lng}));
         pts = pts.filter(p=>isFinite(p.lat)&&isFinite(p.lon));
         if (pts.length < 2) continue;
 
         const color = feat.color || STREET_COLORS[streets.length % STREET_COLORS.length];
+        const arrondissement = feat.arrondissement || null;
         const id = ++streetIdCounter;
-        const s = { id, name: feat.name, markers: [], polyline: null, hitPolyline: null, bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false };
+        const s = { id, name: feat.name, markers: [], polyline: null, hitPolyline: null,
+                    bufferLayer: null, origPts: pts.map(p=>({...p})), color, loading: false, arrondissement };
         streets.push(s);
         activeStreetId = id;
         buildLineForStreet(s, pts);
+        if (!arrondissement) streetsNeedingArr.push(s);
         imported++;
       }
 
-      renderStreetList(); fitStreet(); updateStats();
-      setStatus(`✓ Importé : ${imported} rue(s) depuis ${file.name}`, 'ready');
+      // Récupérer l'arrondissement via Nominatim pour les rues qui n'en ont pas
+      streetsNeedingArr.forEach((s, i) => {
+        setTimeout(() => {
+          const mid = s.markers[Math.floor(s.markers.length/2)];
+          if (!mid) return;
+          const ll = mid.getLatLng();
+          fetchArrondissement(ll.lat, ll.lng).then(arr => {
+            s.arrondissement = arr;
+            renderStreetList();
+          });
+        }, i * 1200);
+      });
+
+      undoStack = [];  // import = nouvelle base, on repart à zéro
+      updateUndoBtn();
+      renderStreetList(); fitStreet(); updateStats(); updateStreetNameBar();
+      setStatus(`✓ Importé : ${imported} rue(s) — sauvegarde en cours…`, 'ready');
+
+      // Sauvegarder immédiatement sur le serveur → devient le nouveau "latest"
+      const geojson = buildGeoJSON();
+      fetch(SERVER_BASE + '/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(geojson, null, 2)
+      }).then(r => r.json()).then(d => {
+        if (d.ok) setStatus(`✓ ${imported} rue(s) importée(s) et sauvegardées (${d.version})`, 'ready');
+        else      setStatus(`✓ ${imported} rue(s) importée(s) — serveur indisponible`, 'ready');
+      }).catch(() => {
+        setStatus(`✓ ${imported} rue(s) importée(s) — serveur non démarré`, 'ready');
+      });
     } catch(err) {
       setStatus('Erreur import : '+err.message,'error');
       alert('Impossible de lire ce fichier JSON :\n'+err.message);
@@ -2030,9 +2070,12 @@ function resetAll() {
   streets          = [];
   activeStreetId   = null;
   streetIdCounter  = 0;
+  undoStack        = [];
 
   renderStreetList();
   updateStats();
+  updateStreetNameBar();
+  updateUndoBtn();
   setStatus('Carte réinitialisée — importez un fichier GeoJSON', 'loading');
 
   // Proposer l'import directement
@@ -5383,14 +5426,15 @@ function loadGeoJSONFeatures(geojson) {
   const loaded = await loadLatestSave();
 
   if (loaded && streets.length) {
-    fitStreet();
     setStatus(`${streets.length} rue(s) restaurée(s) depuis la dernière sauvegarde`, 'ready');
   } else {
     // 2) Fallback : données embarquées dans le HTML
     loadGeoJSONFeatures(getEmbeddedGeoJSON());
-    fitStreet();
     setStatus(`${streets.length} rue(s) chargée(s) — ajoutez-en d'autres !`, 'ready');
   }
+
+  // Toujours recentrer sur l'Hôtel de Ville au chargement
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 })();
 </script>
 </body>
