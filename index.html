@@ -101,6 +101,20 @@
       color: #6470a8; padding: 0 14px; margin: 6px 0 8px;
     }
 
+    /* Fichier chargé */
+    #current-file-label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px 8px;
+      font-size: 11px; color: #6470a8;
+    }
+    #current-file-label .file-icon { flex-shrink: 0; opacity: 0.7; }
+    #current-file-label .file-name {
+      flex: 1; font-weight: 600; color: #a0aec0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10.5px;
+    }
+    #current-file-label.no-file .file-name { color: #4a5280; font-style: italic; font-family: inherit; font-size: 11px; font-weight: 400; }
+
     /* Toggle */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; }
     .toggle-label { font-size: 12px; color: #a0aec0; }
@@ -185,6 +199,31 @@
     .btn-ghost:hover { color: #e2e8f0; background: #1c2040; }
     .btn-green { background: #1e4d3a; color: #2ecc71; border: 1px solid #2a6b50; }
     .btn-save  { background: #1a3050; color: #5dade2; border: 1px solid #2a5070; font-weight: 700; }
+    .btn-validate {
+      background: #27ae60; color: #fff; border: none;
+      font-weight: 800; font-size: 13px; letter-spacing: 0.3px;
+      transition: background .15s;
+    }
+    .btn-validate:hover { background: #2ecc71; }
+    .btn-validate.already { background: #1e4d3a; color: #2ecc71; border: 1px solid #2a6b50; cursor: default; }
+    .btn-colorize { background: #2c1f4a; color: #b794f4; border: 1px solid #553c9a; transition: background .15s; }
+    .btn-colorize:hover { background: #44337a; color: #d6bcfa; }
+    /* Compteur de progression */
+    #validation-counter {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 14px 3px; font-size: 11px; color: #6470a8;
+    }
+    #validation-counter .vc-label { }
+    #validation-counter .vc-count { font-weight: 800; color: #27ae60; }
+    #validation-counter .vc-total { color: #4a5280; }
+    /* Barre de progression */
+    #validation-bar-wrap {
+      margin: 0 14px 6px; height: 3px; background: #232645; border-radius: 2px; overflow: hidden;
+    }
+    #validation-bar { height: 100%; background: #27ae60; border-radius: 2px; transition: width .3s ease; width: 0%; }
+    /* Rue validée dans la liste → nom légèrement teinté vert */
+    .street-list-item.validated .street-list-name { color: #6fcf97; }
+    .street-list-item.validated .street-list-meta  { color: #3a7d5a; }
     .btn-save:hover { background: #1e3d63; }
     .btn-save:disabled { opacity: .5; cursor: default; }
     .btn-reset { background: #2a1010; color: #e74c3c; border: 1px solid #7b2020; font-weight: 700; margin-top: 10px; }
@@ -383,7 +422,10 @@
     </div>
 
     <!-- Street selector dropdown + list -->
-    <div class="section-title">Rues</div>
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Rues</span>
+      <span id="validation-counter-inline" style="font-size:11px;font-weight:700;color:#27ae60"></span>
+    </div>
     <div id="street-selector-wrap">
       <select id="street-selector" onchange="selectStreetFromDropdown(this.value)" size="1">
         <option value="">— Sélectionner une rue —</option>
@@ -396,6 +438,7 @@
       <button class="btn-pencil" id="btn-pencil" onclick="toggleRenameBar()" title="Renommer la rue" style="display:none">✏</button>
     </div>
 
+    <div id="validation-bar-wrap"><div id="validation-bar"></div></div>
     <div id="street-list-wrap">
       <div id="street-list">
         <div class="street-list-empty">Aucune rue ajoutée</div>
@@ -466,6 +509,17 @@
     </div>
 
     <div class="section-title" style="margin-top:4px">Actions</div>
+
+    <!-- Bouton validation -->
+    <button class="btn btn-validate" id="btn-validate" onclick="validateStreet()">✓&nbsp; Valider cette rue</button>
+    <!-- Bouton colorisation finale -->
+    <button class="btn btn-colorize" onclick="colorizeAll()" title="Attribue une couleur distincte à chaque rue (après validation complète)">🎨&nbsp; Coloriser toutes les rues</button>
+
+    <!-- Fichier actuellement chargé -->
+    <div id="current-file-label" class="no-file">
+      <span class="file-icon">📂</span>
+      <span class="file-name" id="current-file-name">Aucun fichier chargé</span>
+    </div>
 
     <!-- Hidden file input for JSON import -->
     <input type="file" id="json-file-input" accept=".json,.geojson" style="display:none" onchange="importJSON(event)">
@@ -542,6 +596,7 @@ let streets       = [];  // [{id, name, markers, polyline, hitPolyline, bufferLa
 let activeStreetId = null;
 let streetIdCounter = 0;
 let undoStack     = [];   // snapshots pour Ctrl+Z
+let currentFileName = null; // nom du fichier JSON actuellement chargé
 let searchTimer   = null;  // debounce for autocomplete
 
 // Convenience: get active street object
@@ -1418,6 +1473,7 @@ function selectStreet(id) {
   renderStreetList();
   updateStats();
   updateStreetNameBar();
+  updateValidateBtn();
 
   // Sync dropdown
   const sel = document.getElementById('street-selector');
@@ -1503,13 +1559,24 @@ function renderStreetList() {
   // ── Sort alphabetically ──
   const sorted = [...streets].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
+  // ── Compteur de validation ──
+  const nbValidated = streets.filter(s => s.color === COLOR_VALIDATED).length;
+  const nbTotal     = streets.length;
+  const pct         = nbTotal ? Math.round(nbValidated / nbTotal * 100) : 0;
+  const counterEl   = document.getElementById('validation-counter-inline');
+  if (counterEl) counterEl.textContent = nbTotal ? `${nbValidated} / ${nbTotal} ✓` : '';
+  const barEl = document.getElementById('validation-bar');
+  if (barEl) barEl.style.width = pct + '%';
+
   // ── Render list ──
   listEl.innerHTML = sorted.map(s => {
-    const active  = s.id === activeStreetId ? ' active' : '';
-    const loading = s.loading ? ' loading' : '';
-    return `<div class="street-list-item${active}${loading}" data-sid="${s.id}" onclick="selectStreet(${s.id})">
+    const active     = s.id === activeStreetId ? ' active' : '';
+    const loading    = s.loading ? ' loading' : '';
+    const validated  = s.color === COLOR_VALIDATED ? ' validated' : '';
+    const checkmark  = s.color === COLOR_VALIDATED ? ' ✓' : '';
+    return `<div class="street-list-item${active}${loading}${validated}" data-sid="${s.id}" onclick="selectStreet(${s.id})">
       <div class="street-dot" style="background:${s.color}"></div>
-      <div class="street-list-name" title="Double-clic pour renommer" ondblclick="startRename(${s.id}, event)">${s.name}</div>
+      <div class="street-list-name" title="Double-clic pour renommer" ondblclick="startRename(${s.id}, event)">${s.name}${checkmark}</div>
       <div class="street-list-meta">${getMeta(s)}</div>
       <button class="street-delete" onclick="removeStreet(${s.id},event)" title="Supprimer">✕</button>
     </div>`;
@@ -1519,8 +1586,9 @@ function renderStreetList() {
   const selectedId = activeStreetId;
   let html = '<option value="">— Sélectionner une rue —</option>';
   for (const s of sorted) {
-    const sel = s.id === selectedId ? ' selected' : '';
-    html += `<option value="${s.id}"${sel}>${s.name}</option>`;
+    const sel   = s.id === selectedId ? ' selected' : '';
+    const check = s.color === COLOR_VALIDATED ? ' ✓' : '';
+    html += `<option value="${s.id}"${sel}>${s.name}${check}</option>`;
   }
   selEl.innerHTML = html;
 }
@@ -1598,6 +1666,7 @@ function spawnMarker(pt, idx) {
     if (activeStreetId !== m._streetId) selectStreet(m._streetId);
     refreshPolyline();
     if (showBuf) renderBuffer();
+    if (gfShowCircles) renderGeofencingCircles();
     updateTooltip(m, s.markers.indexOf(m));
   });
   m.on('dragend', () => { updateStats(); renderStreetList(); autoSave(); });
@@ -1695,6 +1764,65 @@ function renderBuffer() {
 // ═══════════════════════════════════════════════════
 //  COLOUR
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+//  VALIDATION — passe la rue active en vert
+// ═══════════════════════════════════════════════════
+const COLOR_VALIDATED = '#27ae60';
+const COLOR_TODO      = '#e74c3c';
+
+function validateStreet() {
+  const s = getActive();
+  if (!s) return;
+  const already = s.color === COLOR_VALIDATED;
+  // Toggle : si déjà verte → repasse en rouge (désvalider)
+  const newColor = already ? COLOR_TODO : COLOR_VALIDATED;
+  setLineColor(newColor, null);
+  updateValidateBtn();
+}
+
+function updateValidateBtn() {
+  const s = getActive();
+  const btn = document.getElementById('btn-validate');
+  if (!btn) return;
+  if (!s) { btn.textContent = '✓ Valider cette rue'; btn.className = 'btn btn-validate'; return; }
+  if (s.color === COLOR_VALIDATED) {
+    btn.textContent = '↩ Dé-valider cette rue';
+    btn.className   = 'btn btn-validate already';
+  } else {
+    btn.textContent = '✓ Valider cette rue';
+    btn.className   = 'btn btn-validate';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  COLORISATION FINALE — palette variée après validation
+// ═══════════════════════════════════════════════════
+function colorizeAll() {
+  if (!streets.length) return;
+  // Tri alphabétique pour une attribution cohérente
+  const sorted = [...streets].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  sorted.forEach((s, i) => {
+    const color = STREET_COLORS[i % STREET_COLORS.length];
+    s.color = color;
+    if (s.polyline) {
+      const isActive = s.id === activeStreetId;
+      s.polyline.setStyle({ color, weight: isActive ? 6 : 3, opacity: isActive ? 1.0 : 0.6 });
+    }
+    s.markers.forEach((m, mi) => m.setIcon(makeIcon(mi === 0 || mi === s.markers.length - 1, color)));
+  });
+  // Sync le CSS et le color picker avec la rue active
+  const active = getActive();
+  if (active) {
+    document.documentElement.style.setProperty('--line-color', active.color);
+    document.getElementById('custom-color').value = active.color;
+    document.querySelectorAll('.swatch').forEach(sw => {
+      sw.classList.toggle('active', sw.dataset.color === active.color);
+    });
+  }
+  renderStreetList();
+  autoSave();
+}
+
 function setLineColor(color, btn) {
   const s = getActive();
   if (s) {
@@ -1715,8 +1843,23 @@ function setLineColor(color, btn) {
 // ═══════════════════════════════════════════════════
 //  JSON IMPORT
 // ═══════════════════════════════════════════════════
+function updateCurrentFileLabel(name) {
+  const wrap = document.getElementById('current-file-label');
+  const span = document.getElementById('current-file-name');
+  if (name) {
+    currentFileName = name;
+    span.textContent = name;
+    wrap.classList.remove('no-file');
+  } else {
+    currentFileName = null;
+    span.textContent = 'Aucun fichier chargé';
+    wrap.classList.add('no-file');
+  }
+}
+
 function importJSON(ev) {
   const file = ev.target.files[0]; if (!file) return;
+  updateCurrentFileLabel(file.name);
   const reader = new FileReader();
   reader.onload = e => {
     try {
@@ -1770,11 +1913,8 @@ function importJSON(ev) {
       if (data.type==='Feature') {
         pushFeature(data, file.name.replace(/\.geo?json$/,''));
       }
-      // GeoJSON FeatureCollection — import ALL features (LineString, Polygon, MultiPolygon)
-      else if (data.type==='FeatureCollection') {
-        for (const f of (data.features||[])) pushFeature(f, 'Voie importée');
-      }
       // Format personnalisé circles_all_streets.json : { streets: [{nom_rue, centres:[{lat,lng}]}] }
+      // Ce check passe AVANT FeatureCollection car le fichier a type:"FeatureCollection" ET streets[]
       else if (Array.isArray(data.streets)) {
         for (const s of data.streets) {
           if (!Array.isArray(s.centres) || s.centres.length < 2) continue;
@@ -1788,6 +1928,10 @@ function importJSON(ev) {
             pas_m:     s.pas_m || null,
           });
         }
+      }
+      // GeoJSON FeatureCollection standard
+      else if (data.type==='FeatureCollection') {
+        for (const f of (data.features||[])) pushFeature(f, 'Voie importée');
       }
       // Raw array or coordinates
       else {
@@ -2138,6 +2282,7 @@ function resetAll() {
   updateStats();
   updateStreetNameBar();
   updateUndoBtn();
+  updateCurrentFileLabel(null);
   setStatus('Carte réinitialisée — importez un fichier GeoJSON', 'loading');
 
   // Proposer l'import directement
@@ -2264,6 +2409,14 @@ function gfResample(pts, pas) {
   const last = pts[pts.length-1];
   if (gfHaversine(centres[centres.length-1].lon, centres[centres.length-1].lat, last.lon, last.lat) > 1) {
     centres.push(last);
+  }
+  // Anti-chevauchement fin de rue : supprimer le dernier centre si trop proche de l'avant-dernier (< 50% du pas)
+  if (centres.length >= 2) {
+    const prev = centres[centres.length-2];
+    const cur  = centres[centres.length-1];
+    if (gfHaversine(prev.lon, prev.lat, cur.lon, cur.lat) < pas * 0.5) {
+      centres.pop();
+    }
   }
   return centres;
 }
